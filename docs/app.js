@@ -64,7 +64,7 @@ badLogin:['Ange en giltig e-post och ett lösenord på minst 6 tecken.','Enter a
 demoNote:['Prototyp med exempeldata. Allt du gör sparas bara i din webbläsare.','Prototype with sample data. Everything is stored only in your browser.'],
 notFound:['Sidan finns inte.','Page not found.'],back:['Tillbaka','Back'],forgetTitle:['Återställ lösenord','Reset password'],
 privacy:['Integritet: namn, e-post, telefon, adress och chipnummer visas aldrig offentligt.','Privacy: name, email, phone, address and chip number are never shown publicly.'],
-prevPhoto:['Föregående bild','Previous photo'],nextPhoto:['Nästa bild','Next photo'],seenLast:['Sågs senast','Last seen'],seenPh:['Skriv en adress eller plats','Type an address or place'],seenHint:['Välj ett förslag i listan eller tryck på platssymbolen. Bara område och ort sparas, aldrig din exakta position.','Pick a suggestion or tap the location symbol. Only area and city are saved, never your exact position.'],sugNone:['Inga förslag. Prova en annan stavning.','No suggestions. Try another spelling.'],loading:['Laddar …','Loading …'],deletedUser:['Raderad användare','Deleted user'],saveFind:['Spara fyndrapporten på mitt konto','Save this find to my account'],findSaved:['Fyndrapporten är sparad privat.','Find report saved privately.'],
+prevPhoto:['Föregående bild','Previous photo'],nextPhoto:['Nästa bild','Next photo'],seenLast:['Sågs senast','Last seen'],seenPh:['Skriv en adress eller plats','Type an address or place'],seenHint:['Välj ett förslag i listan eller tryck på platssymbolen. Bara område och ort sparas, aldrig din exakta position.','Pick a suggestion or tap the location symbol. Only area and city are saved, never your exact position.'],sugNone:['Inga förslag. Prova en annan stavning.','No suggestions. Try another spelling.'],mapTitle:['Välj plats','Choose location'],mapHint:['Dra markören eller tryck på kartan för att flytta den till rätt plats.','Drag the marker or tap the map to move it to the right spot.'],mapHintNoGps:['Din position hittades inte. Tryck på kartan för att välja plats.','Your position was not found. Tap the map to choose a spot.'],mapUse:['Använd den här platsen','Use this place'],mapFinding:['Söker plats…','Finding place…'],mapPickHint:['Tryck på kartan för att välja plats','Tap the map to choose a place'],mapWait:['Vänta tills platsen visas under kartan.','Wait until the place shows under the map.'],mapFail:['Kartan kunde inte laddas. Skriv platsen i stället.','The map could not load. Type the place instead.'],loading:['Laddar …','Loading …'],deletedUser:['Raderad användare','Deleted user'],saveFind:['Spara fyndrapporten på mitt konto','Save this find to my account'],findSaved:['Fyndrapporten är sparad privat.','Find report saved privately.'],
 needLoginSave:['Logga in för att spara fyndrapporten.','Log in to save the report.'],resetTitle:['Välj nytt lösenord','Choose a new password'],newPw:['Nytt lösenord (minst 6 tecken)','New password (at least 6 characters)'],pwSaved:['Lösenordet är ändrat.','Password changed.'],
 resetSent:['Om adressen finns får du ett mejl med en länk för att välja nytt lösenord.','If the address exists you will get an email with a reset link.'],typeEmail:['Skriv din e-postadress först.','Type your email address first.'],
 checkEmail:['Konto skapat. Kolla din e-post och bekräfta, logga sedan in.','Account created. Check your email to confirm, then log in.'],editPet:['Redigera djur','Edit pet'],saved:['Ändringarna är sparade.','Changes saved.'],
@@ -177,11 +177,10 @@ lang(v){S.lang=v;try{localStorage.setItem('dh-lang',v)}catch(e){}saveFields();re
 sp(v){tmp.sp=v;rerender(true)},phPrev(){tmp.photoIdx=Math.max(0,tmp.photoIdx-1);rerender(true)},phNext(){tmp.photoIdx++;rerender(true)},ph(v){tmp.photoIdx=+v;rerender(true)},
 fsp(v){saveFields();tmp.find=tmp.find||{species:'',place:'',desc:''};tmp.find.species=v;rerender(true)},
 rmFound(v){saveFields();tmp.foundPhotos.splice(+v,1);rerender(true)},rmPet(v){saveFields();tmp.petPhotos.splice(+v,1);rerender(true)},
-loc(){saveFields();tmp.find=tmp.find||{species:'',place:'',desc:''};if(!navigator.geolocation)return toast(t('locDenied'));
-navigator.geolocation.getCurrentPosition(async pos=>{try{const[area,city]=await reverseGeo(pos.coords.latitude,pos.coords.longitude);const name=area||city;if(!name)return toast(t('locNoName'));tmp.find.place=name;rerender(true)}catch(e){toast(t('locNoName'))}},()=>toast(t('locDenied')),{timeout:8000})},
+loc(){saveFields();tmp.find=tmp.find||{species:'',place:'',desc:''};openMap((pl,ci)=>{tmp.find.place=pl||ci;rerender(true)})},
 search(){saveFields();const f=tmp.find||{};if(!f.species)return toast(t('needSpecies'));if(!(f.place||'').trim())return toast(t('needPlace'));tmp.tab='area';location.hash='#/results'},
-locLost(){if(!navigator.geolocation)return toast(t('locDenied'));
-navigator.geolocation.getCurrentPosition(async pos=>{try{const[area,city]=await reverseGeo(pos.coords.latitude,pos.coords.longitude);if(!area&&!city)return toast(t('locNoName'));setLostLoc(area||city,city||area)}catch(e){toast(t('locNoName'))}},()=>toast(t('locDenied')),{timeout:8000})},
+locLost(){openMap((pl,ci)=>setLostLoc(pl||ci,ci||pl))},
+mapOk(){mapConfirm()},mapCancel(){mapClose()},
 pickSug(v){const x=tmp.sugs[+v];if(x)setLostLoc(x.place,x.city)},
 tab(v){tmp.tab=v;rerender(true)},
 async saveFind(){await DB.saveFind(S.user.id,tmp.find,tmp.foundPhotos.map(p=>p.blob));toast(t('findSaved'))},
@@ -212,6 +211,27 @@ async function searchPlaces(q){const r=await fetch('https://nominatim.openstreet
 function onPlaceInput(v){clearTimeout(sugTimer);if(tmp.lostLoc&&tmp.lostLoc.label!==v)tmp.lostLoc=null;if(v.trim().length<3){clearSug();return}
 sugTimer=setTimeout(async()=>{if(sugCtl)sugCtl.abort();sugCtl=new AbortController();const wait=Math.max(0,1100-(Date.now()-sugLast));if(wait)await new Promise(r=>setTimeout(r,wait));sugLast=Date.now();
 try{const res=await searchPlaces(v.trim());const e=$('#sug');if(!e||$('#lp').value.trim()!==v.trim())return;tmp.sugs=res;e.innerHTML=res.length?res.map((x,i)=>`<button type="button" data-act="pickSug" data-v="${i}">${esc(x.label)}</button>`).join(''):`<div class="hint">${t('sugNone')}</div>`}catch(x){if(x&&x.name==='AbortError')return;clearSug()}},700)}
+/* ---------- karta för att finjustera plats (Leaflet + OpenStreetMap, laddas först när den behövs) ---------- */
+let MAP=null;
+function loadLeaflet(){if(window.L)return Promise.resolve();return new Promise((ok,no)=>{const l=document.createElement('link');l.rel='stylesheet';l.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(l);const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';s.onload=ok;s.onerror=no;document.head.appendChild(s)})}
+function getPos(){return new Promise(ok=>{if(!navigator.geolocation)return ok(null);navigator.geolocation.getCurrentPosition(p=>ok([p.coords.latitude,p.coords.longitude]),()=>ok(null),{timeout:8000,enableHighAccuracy:true})})}
+async function openMap(cb){if(MAP)return;MAP={cb,cur:null,tm:null};toast(t('mapFinding'));let pos,ok=true;
+try{[pos]=await Promise.all([getPos(),loadLeaflet()])}catch(e){ok=false}
+if(!ok||!window.L){MAP=null;return toast(t('mapFail'))}
+const ov=document.createElement('div');ov.id='mapov';ov.setAttribute('role','dialog');ov.setAttribute('aria-modal','true');
+ov.innerHTML=`<div class="mh"><b>${esc(t('mapTitle'))}</b><span class="muted">${esc(t(pos?'mapHint':'mapHintNoGps'))}</span></div><div id="map"></div><div class="mf"><div id="mlabel" class="mlabel">${esc(t('mapFinding'))}</div><div class="row"><button class="btn" data-act="mapOk">${esc(t('mapUse'))}</button><button class="btn sec" data-act="mapCancel">${esc(t('cancel'))}</button></div></div>`;
+document.body.appendChild(ov);
+const start=pos||[62,15];const map=L.map('map',{zoomControl:true}).setView(start,pos?16:5);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+const icon=L.divIcon({className:'pin',html:'<svg width="38" height="46" viewBox="0 0 38 46"><path d="M19 45C19 45 3 28 3 17a16 16 0 0 1 32 0c0 11-16 28-16 28z" fill="#F4806B" stroke="#3A2A1E" stroke-width="2.5"/><circle cx="19" cy="17" r="6" fill="#FFFCF5"/></svg>',iconSize:[38,46],iconAnchor:[19,45]});
+const mk=L.marker(start,{draggable:true,icon}).addTo(map);MAP.map=map;MAP.mk=mk;
+const upd=()=>{const ll=mk.getLatLng();MAP.cur=null;const lb=$('#mlabel');if(lb)lb.textContent=t('mapFinding');clearTimeout(MAP.tm);MAP.tm=setTimeout(async()=>{try{const[area,city]=await reverseGeo(ll.lat,ll.lng);if(!MAP)return;const name=area&&city&&area!==city?area+', '+city:(area||city);MAP.cur=name?{area,city}:null;const l2=$('#mlabel');if(l2)l2.textContent=name||t('locNoName')}catch(e){const l2=$('#mlabel');if(l2)l2.textContent=t('locNoName')}},700)};
+mk.on('dragend',upd);map.on('click',e=>{mk.setLatLng(e.latlng);upd()});
+if(pos)upd();else{const lb=$('#mlabel');if(lb)lb.textContent=t('mapPickHint')}
+setTimeout(()=>map.invalidateSize(),50)}
+function mapClose(){if(!MAP)return;clearTimeout(MAP.tm);try{MAP.map&&MAP.map.remove()}catch(e){}const o=$('#mapov');if(o)o.remove();MAP=null}
+function mapConfirm(){if(!MAP||!MAP.cur)return toast(t('mapWait'));const{area,city}=MAP.cur,cb=MAP.cb;mapClose();cb(area,city)}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')mapClose()});
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;e.preventDefault();const f=A[b.dataset.act];if(!f||tmp.busy)return;tmp.busy=true;try{await f(b.dataset.v)}catch(x){toast(errMsg(x))}finally{tmp.busy=false}});
 let sx=null;document.addEventListener('touchstart',e=>{sx=e.target.closest('.hero')?e.touches[0].clientX:null},{passive:true});
 document.addEventListener('touchend',e=>{if(sx===null)return;const d=e.changedTouches[0].clientX-sx;sx=null;if(Math.abs(d)<40)return;const b=document.querySelector(d<0?'.hero .arr.r':'.hero .arr.l');if(b)b.click()},{passive:true});
