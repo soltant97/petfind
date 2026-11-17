@@ -43,7 +43,9 @@
     async session() { return (await sb.auth.getSession()).data.session; },
     async profile() {
       const s = await DB.session(); if (!s) return null;
-      const d = ok(await sb.from('profiles').select('id,username,paused,home_country').eq('id', s.user.id).maybeSingle());
+      let r = await sb.from('profiles').select('id,username,paused,home_country').eq('id', s.user.id).maybeSingle();
+      if (r.error) r = await sb.from('profiles').select('id,username,paused').eq('id', s.user.id).maybeSingle(); // databasen saknar ännu landsfunktionen
+      const d = ok(r);
       return d ? { id: d.id, name: d.username, paused: d.paused, country: d.home_country || 'SE', email: s.user.email } : null;
     },
     onAuth(cb) { return sb.auth.onAuthStateChange((ev, session) => cb(ev, session)); },
@@ -64,7 +66,10 @@
     },
     /* ----- offentlig sökning (säkra funktioner) ----- */
     async searchLost(q, species, country) {
-      const rows = ok(await sb.rpc('search_lost_pets', { p_query: q || null, p_species: species === 'all' ? null : species, p_country: country || null }));
+      const a = { p_query: q || null, p_species: species === 'all' ? null : species };
+      let r = await sb.rpc('search_lost_pets', { ...a, p_country: country || null });
+      if (r.error) r = await sb.rpc('search_lost_pets', a); // gammal databas utan land
+      const rows = ok(r);
       return attach(rows.map(fromLost));
     },
     async getLost(id) {
@@ -72,7 +77,10 @@
       return rows.length ? (await attach([fromLost(rows[0])]))[0] : null;
     },
     async match(f, scope, country) {
-      const rows = ok(await sb.rpc('match_lost_pets', { p_species: f.species, p_place: f.place, p_scope: scope, p_description: f.desc || '', p_country: country || null }));
+      const a = { p_species: f.species, p_place: f.place, p_scope: scope, p_description: f.desc || '' };
+      let r = await sb.rpc('match_lost_pets', { ...a, p_country: country || null });
+      if (r.error) r = await sb.rpc('match_lost_pets', a);
+      const rows = ok(r);
       return attach(rows.map(fromLost));
     },
     /* ----- mina djur ----- */
