@@ -64,7 +64,7 @@ badLogin:['Ange en giltig e-post och ett lösenord på minst 6 tecken.','Enter a
 demoNote:['Prototyp med exempeldata. Allt du gör sparas bara i din webbläsare.','Prototype with sample data. Everything is stored only in your browser.'],
 notFound:['Sidan finns inte.','Page not found.'],back:['Tillbaka','Back'],forgetTitle:['Återställ lösenord','Reset password'],
 privacy:['Integritet: namn, e-post, telefon, adress och chipnummer visas aldrig offentligt.','Privacy: name, email, phone, address and chip number are never shown publicly.'],
-loading:['Laddar …','Loading …'],deletedUser:['Raderad användare','Deleted user'],saveFind:['Spara fyndrapporten på mitt konto','Save this find to my account'],findSaved:['Fyndrapporten är sparad privat.','Find report saved privately.'],
+prevPhoto:['Föregående bild','Previous photo'],nextPhoto:['Nästa bild','Next photo'],loading:['Laddar …','Loading …'],deletedUser:['Raderad användare','Deleted user'],saveFind:['Spara fyndrapporten på mitt konto','Save this find to my account'],findSaved:['Fyndrapporten är sparad privat.','Find report saved privately.'],
 needLoginSave:['Logga in för att spara fyndrapporten.','Log in to save the report.'],resetTitle:['Välj nytt lösenord','Choose a new password'],newPw:['Nytt lösenord (minst 6 tecken)','New password (at least 6 characters)'],pwSaved:['Lösenordet är ändrat.','Password changed.'],
 resetSent:['Om adressen finns får du ett mejl med en länk för att välja nytt lösenord.','If the address exists you will get an email with a reset link.'],typeEmail:['Skriv din e-postadress först.','Type your email address first.'],
 checkEmail:['Konto skapat. Kolla din e-post och bekräfta, logga sedan in.','Account created. Check your email to confirm, then log in.'],editPet:['Redigera djur','Edit pet'],saved:['Ändringarna är sparade.','Changes saved.'],
@@ -104,8 +104,8 @@ async function vList(){return `${topbar(t('lostTitle'),t('lostSub'))}<div class=
 let listTok=0;
 async function fillList(){const tok=++listTok;const el=$('#list');if(!el)return;try{const items=await DB.searchLost(tmp.q.trim(),tmp.sp);if(tok!==listTok||!$('#list'))return;$('#list').innerHTML=items.length?items.map(p=>petCard(p)).join(''):`<div class="info">${t(tmp.q||tmp.sp!=='all'?'noLost':'noRegistered')}</div>`}catch(e){if(tok===listTok&&$('#list'))$('#list').innerHTML=`<div class="info warn">${esc(errMsg(e))}</div>`}}
 async function vPet(id){let p=await DB.getLost(id);if(!p&&S.user)p=await DB.myPet(id);if(!p)return head(t('notFound'),'','#/');
-const ph=p.imgs||[];const i=Math.min(tmp.photoIdx,Math.max(ph.length-1,0));const ang=['front','left','right'];const own=mineP(p);
-return `<div class="hero"><a class="back" href="#/" aria-label="${esc(t('back'))}">${ic.back}</a>${ph.length?`<img src="${esc(ph[i])}" alt="${esc(p.name)}">`:sz(paw,84)}${ph.length>1?`<div class="chips">${ph.map((_,k)=>`<button data-act="ph" data-v="${k}" class="${k===i?'on':''}">${t(ang[k]||'front')}${ang[k]?'':' '+(k+1)}</button>`).join('')}</div>`:''}</div>
+const ph=p.imgs||[];const i=Math.min(tmp.photoIdx,Math.max(ph.length-1,0));const own=mineP(p);
+return `<div class="hero"><a class="back" href="#/" aria-label="${esc(t('back'))}">${ic.back}</a>${ph.length?`<img src="${esc(ph[i])}" alt="${esc(p.name)}">`:sz(paw,84)}${i>0?`<button class="arr l" data-act="phPrev" aria-label="${esc(t('prevPhoto'))}">‹</button>`:''}${i<ph.length-1?`<button class="arr r" data-act="phNext" aria-label="${esc(t('nextPhoto'))}">›</button>`:''}${ph.length>1?`<div class="dots">${ph.map((_,k)=>`<i class="${k===i?'on':''}"></i>`).join('')}</div>`:''}</div>
 <div class="pad"><div style="display:flex;justify-content:space-between;align-items:center"><h1>${esc(p.name)}</h1>${tagOf(p)}</div>
 <div class="grid3" style="margin-top:14px"><div class="cell"><small>${t('species')}</small><b>${esc(speciesName(p.species))}</b></div><div class="cell"><small>${t('sex')}</small><b>${esc(p.sex==='f'?t('female'):p.sex==='m'?t('male'):t('unknown'))}</b></div><div class="cell"><small>${t('age')}</small><b>${p.age!=null&&p.age!==''?esc(p.age)+' '+t('years'):'–'}</b></div><div class="cell" style="grid-column:span 3"><small>${t('colorBreed')}</small><b>${esc(p.color)}${p.breed?' · '+esc(p.breed):''}</b></div></div>
 ${p.marks?`<div class="field"><div class="lbl" style="color:var(--m);font-size:13px">${t('marks')}</div><div style="font-weight:600;line-height:1.4">${esc(p.marks)}</div></div>`:''}
@@ -174,7 +174,7 @@ async function reverseGeo(lat,lon){const r=await fetch(`https://nominatim.openst
 const val=id=>($('#'+id)||{value:''}).value.trim();
 const A={
 lang(v){S.lang=v;try{localStorage.setItem('dh-lang',v)}catch(e){}saveFields();rerender(true)},
-sp(v){tmp.sp=v;rerender(true)},ph(v){tmp.photoIdx=+v;rerender(true)},
+sp(v){tmp.sp=v;rerender(true)},phPrev(){tmp.photoIdx=Math.max(0,tmp.photoIdx-1);rerender(true)},phNext(){tmp.photoIdx++;rerender(true)},ph(v){tmp.photoIdx=+v;rerender(true)},
 fsp(v){saveFields();tmp.find=tmp.find||{species:'',place:'',desc:''};tmp.find.species=v;rerender(true)},
 rmFound(v){saveFields();tmp.foundPhotos.splice(+v,1);rerender(true)},rmPet(v){saveFields();tmp.petPhotos.splice(+v,1);rerender(true)},
 loc(){saveFields();tmp.find=tmp.find||{species:'',place:'',desc:''};if(!navigator.geolocation)return toast(t('locDenied'));
@@ -205,6 +205,8 @@ async pause(){await DB.setPaused(!S.user.paused);S.user.paused=!S.user.paused;to
 async delAcc(){if(!confirm(t('confirmDelAcc')))return;await DB.deleteAccount();await loadUser();toast(t('accDeleted'));location.hash='#/';rerender()},
 async logout(){await DB.signOut();await loadUser();tmp.next='';location.hash='#/';rerender()}};
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;e.preventDefault();const f=A[b.dataset.act];if(!f||tmp.busy)return;tmp.busy=true;try{await f(b.dataset.v)}catch(x){toast(errMsg(x))}finally{tmp.busy=false}});
+let sx=null;document.addEventListener('touchstart',e=>{sx=e.target.closest('.hero')?e.touches[0].clientX:null},{passive:true});
+document.addEventListener('touchend',e=>{if(sx===null)return;const d=e.changedTouches[0].clientX-sx;sx=null;if(Math.abs(d)<40)return;const b=document.querySelector(d<0?'.hero .arr.r':'.hero .arr.l');if(b)b.click()},{passive:true});
 let qTimer;document.addEventListener('input',e=>{if(e.target.id==='q'){tmp.q=e.target.value;clearTimeout(qTimer);qTimer=setTimeout(fillList,250)}if(e.target.id==='intro'){const c=$('#cnt');if(c)c.textContent=e.target.value.length+' / 2000'}});
 document.addEventListener('submit',async e=>{const f=e.target.dataset.form;if(!f)return;e.preventDefault();if(tmp.busy)return;tmp.busy=true;
 try{
