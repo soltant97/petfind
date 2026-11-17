@@ -43,11 +43,11 @@
     async session() { return (await sb.auth.getSession()).data.session; },
     async profile() {
       const s = await DB.session(); if (!s) return null;
-      const d = ok(await sb.from('profiles').select('id,username,paused').eq('id', s.user.id).maybeSingle());
-      return d ? { id: d.id, name: d.username, paused: d.paused, email: s.user.email } : null;
+      const d = ok(await sb.from('profiles').select('id,username,paused,home_country').eq('id', s.user.id).maybeSingle());
+      return d ? { id: d.id, name: d.username, paused: d.paused, country: d.home_country || 'SE', email: s.user.email } : null;
     },
     onAuth(cb) { return sb.auth.onAuthStateChange((ev, session) => cb(ev, session)); },
-    async signUp(email, password) { const r = await sb.auth.signUp({ email, password }); if (r.error) throw r.error; return r.data; },
+    async signUp(email, password, country) { const r = await sb.auth.signUp({ email, password, options: { data: { home_country: country || 'SE' } } }); if (r.error) throw r.error; return r.data; },
     async signIn(email, password) { const r = await sb.auth.signInWithPassword({ email, password }); if (r.error) throw r.error; return r.data; },
     async signOut() { await sb.auth.signOut(); },
     async resetPassword(email) { const r = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname }); if (r.error) throw r.error; },
@@ -63,16 +63,16 @@
       await sb.auth.signOut();
     },
     /* ----- offentlig sökning (säkra funktioner) ----- */
-    async searchLost(q, species) {
-      const rows = ok(await sb.rpc('search_lost_pets', { p_query: q || null, p_species: species === 'all' ? null : species }));
+    async searchLost(q, species, country) {
+      const rows = ok(await sb.rpc('search_lost_pets', { p_query: q || null, p_species: species === 'all' ? null : species, p_country: country || null }));
       return attach(rows.map(fromLost));
     },
     async getLost(id) {
       const rows = ok(await sb.rpc('get_lost_pet', { p_id: id }));
       return rows.length ? (await attach([fromLost(rows[0])]))[0] : null;
     },
-    async match(f, scope) {
-      const rows = ok(await sb.rpc('match_lost_pets', { p_species: f.species, p_place: f.place, p_scope: scope, p_description: f.desc || '' }));
+    async match(f, scope, country) {
+      const rows = ok(await sb.rpc('match_lost_pets', { p_species: f.species, p_place: f.place, p_scope: scope, p_description: f.desc || '', p_country: country || null }));
       return attach(rows.map(fromLost));
     },
     /* ----- mina djur ----- */
@@ -111,7 +111,8 @@
       if (ph.length) await sb.storage.from(BUCKET).remove(ph.map((x) => x.path));
       ok(await sb.from('pets').delete().eq('id', id));
     },
-    async reportLost(id, place, city, date, circ) { ok(await sb.rpc('report_lost', { p_pet: id, p_place: place, p_city: city, p_date: date, p_circ: circ })); },
+    async reportLost(id, place, city, date, circ, country, deviceCountry) { ok(await sb.rpc('report_lost', { p_pet: id, p_place: place, p_city: city, p_date: date, p_circ: circ, p_country: country, p_device_country: deviceCountry })); },
+    async setHomeCountry(c) { ok(await sb.rpc('set_home_country', { p_country: c })); },
     async markFound(id) { ok(await sb.rpc('mark_found', { p_pet: id })); },
     async setRegistered(id) { ok(await sb.from('pets').update({ status: 'registered' }).eq('id', id)); },
     /* ----- fyndrapporter (privata) ----- */

@@ -13,6 +13,7 @@ create table if not exists public.profiles (
   paused boolean not null default false,
   created_at timestamptz not null default now()
 );
+alter table public.profiles add column if not exists home_country text not null default 'SE' check (home_country in ('SE','ES'));
 create unique index if not exists profiles_username_ci on public.profiles (lower(username));
 
 create or replace function public.generate_username() returns text
@@ -31,7 +32,10 @@ end $$;
 create or replace function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
-  insert into public.profiles (id, username) values (new.id, public.generate_username());
+  insert into public.profiles (id, username, home_country)
+  values (new.id, public.generate_username(),
+          case when upper(coalesce(new.raw_user_meta_data ->> 'home_country', '')) in ('SE','ES')
+               then upper(new.raw_user_meta_data ->> 'home_country') else 'SE' end);
   return new;
 end $$;
 drop trigger if exists on_auth_user_created on auth.users;
@@ -80,6 +84,7 @@ create table if not exists public.lost_reports (
   created_at timestamptz not null default now(),
   archived_at timestamptz
 );
+alter table public.lost_reports add column if not exists country_code text not null default 'SE' check (country_code in ('SE','ES'));
 create unique index if not exists lost_reports_one_active on public.lost_reports(pet_id) where status = 'active';
 create index if not exists lost_reports_active_idx on public.lost_reports(status);
 
@@ -187,7 +192,7 @@ revoke all on all tables in schema public from anon, authenticated;
 
 -- profiles: användarnamn är offentligt (inga personuppgifter finns i tabellen). Ändras bara via funktioner.
 grant select (id, username) on public.profiles to anon, authenticated;
-grant select (paused) on public.profiles to authenticated;
+grant select (paused, home_country) on public.profiles to authenticated;
 drop policy if exists profiles_read on public.profiles;
 create policy profiles_read on public.profiles for select using (true);
 
@@ -283,19 +288,40 @@ language sql security definer set search_path = '' as $$
   update public.profiles set paused = p_paused where id = auth.uid();
 $$;
 
--- Anmäl djur som borttappat (ägaren härleds från inloggningen, aldrig från klienten)
-create or replace function public.report_lost(p_pet uuid, p_place text, p_city text, p_date date, p_circ text)
+-- Funktioner vars parametrar eller svar ändrats tas bort först (så filen går att köra om)
+drop function if exists public.report_lost(uuid, text, text, date, text);
+drop function if exists public.get_lost_pets(int, int);
+drop function if exists public.search_lost_pets(text, text, int, int);
+drop function if exists public.get_lost_pet(uuid);
+drop function if exists public.match_lost_pets(text, text, text, text);
+
+-- Välj hemland (SE/ES). Visas bara för dig själv.
+create or replace function public.set_home_country(p_country text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if upper(coalesce(p_country, '')) not in ('SE','ES') then raise exception 'Landet stöds inte'; end if;
+  update public.profiles set home_country = upper(p_country) where id = auth.uid();
+end $$;
+
+-- Anmäl djur som borttappat (ägaren härleds från inloggningen, aldrig från klienten).
+-- Platsens land (p_country) måste vara samma som landet enheten befinner sig i (p_device_country).
+create or replace function public.report_lost(p_pet uuid, p_place text, p_city text, p_date date, p_circ text,
+                                              p_country text, p_device_country text)
 returns void language plpgsql security definer set search_path = '' as $$
 begin
   if not exists (select 1 from public.pets where id = p_pet and owner_id = auth.uid()) then
     raise exception 'Djuret finns inte eller är inte ditt';
   end if;
+  if upper(coalesce(p_country, '')) not in ('SE','ES') then raise exception 'Landet stöds inte'; end if;
+  if upper(p_country) is distinct from upper(coalesce(p_device_country, '')) then
+    raise exception 'Platstjänster måste vara på och platsen måste ligga i landet där du befinner dig';
+  end if;
   if (select count(*) from public.pet_photos where pet_id = p_pet) < 2 then
     raise exception 'Minst 2 foton krävs för att efterlysa djuret';
   end if;
   update public.lost_reports set status = 'archived', archived_at = now() where pet_id = p_pet and status = 'active';
-  insert into public.lost_reports (pet_id, last_place, last_city, lost_on, circumstances)
-    values (p_pet, trim(p_place), trim(p_city), p_date, trim(p_circ));
+  insert into public.lost_reports (pet_id, last_place, last_city, lost_on, circumstances, country_code)
+    values (p_pet, trim(p_place), trim(p_city), p_date, trim(p_circ), upper(p_country));
   update public.pets set status = 'lost' where id = p_pet;
 end $$;
 
@@ -415,27 +441,30 @@ end $$;
 -- ---------- Offentliga sökfunktioner: returnerar BARA tillåtna fält ----------
 -- Ingen ägar-id, inget chipnummer, inga personuppgifter. Bara aktivt borttappade djur
 -- vars ägare inte pausat kontot.
-create or replace function public.get_lost_pets(p_limit int default 50, p_offset int default 0)
+create or replace function public.get_lost_pets(p_limit int default 50, p_offset int default 0, p_country text default null)
 returns table (id uuid, name text, species text, breed text, color text, sex text, age_years int, marks text,
-               last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[])
+               last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[], country_code text)
 language sql stable security definer set search_path = '' as $$
   select p.id, p.name, p.species, p.breed, p.color, p.sex, p.age_years, p.marks,
          r.last_place, r.last_city, r.lost_on, r.circumstances, pr.username,
-         coalesce((select array_agg(ph.path order by ph.sort, ph.created_at) from public.pet_photos ph where ph.pet_id = p.id), '{}')
+         coalesce((select array_agg(ph.path order by ph.sort, ph.created_at) from public.pet_photos ph where ph.pet_id = p.id), '{}'),
+         r.country_code
     from public.pets p
     join public.lost_reports r on r.pet_id = p.id and r.status = 'active'
     join public.profiles pr on pr.id = p.owner_id and not pr.paused
    where p.status = 'lost'
+     and (nullif(p_country, '') is null or r.country_code = upper(p_country))
    order by r.lost_on desc, r.created_at desc
    limit least(greatest(p_limit, 1), 100) offset greatest(p_offset, 0);
 $$;
 
 create or replace function public.search_lost_pets(p_query text default null, p_species text default null,
-                                                   p_limit int default 50, p_offset int default 0)
+                                                   p_limit int default 50, p_offset int default 0,
+                                                   p_country text default null)
 returns table (id uuid, name text, species text, breed text, color text, sex text, age_years int, marks text,
-               last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[])
+               last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[], country_code text)
 language sql stable security definer set search_path = '' as $$
-  select g.* from public.get_lost_pets(100, 0) g
+  select g.* from public.get_lost_pets(100, 0, p_country) g
    where (p_species is null or p_species in ('', 'all') or g.species = p_species)
      and (nullif(trim(p_query), '') is null
           or position(lower(trim(p_query)) in lower(concat_ws(' ', g.name, g.breed, g.color, g.marks, g.last_place, g.last_city))) > 0)
@@ -444,14 +473,14 @@ $$;
 
 create or replace function public.get_lost_pet(p_id uuid)
 returns table (id uuid, name text, species text, breed text, color text, sex text, age_years int, marks text,
-               last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[])
+               last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[], country_code text)
 language sql stable security definer set search_path = '' as $$
   select g.* from public.get_lost_pets(100, 0) g where g.id = p_id;
 $$;
 
 -- Upphittat-flödet: förfilter (borttappad + samma djurslag + område) och ordöverlappning.
 -- p_scope: 'area' | 'city' | 'country'. Detta är INTE AI-bildmatchning.
-create or replace function public.match_lost_pets(p_species text, p_place text, p_scope text default 'area', p_description text default '')
+create or replace function public.match_lost_pets(p_species text, p_place text, p_scope text default 'area', p_description text default '', p_country text default null)
 returns table (id uuid, name text, species text, color text, marks text, last_place text, last_city text,
                lost_on date, owner_username text, photo_paths text[], score int, common text[])
 language sql stable security definer set search_path = '' as $$
@@ -463,7 +492,7 @@ language sql stable security definer set search_path = '' as $$
     select g.*,
            array(select distinct w from unnest(regexp_split_to_array(lower(concat_ws(' ', g.color, g.breed, g.marks)), '[^a-zåäöé0-9]+')) w
                   where array_position((select ws from q), w) is not null) as common_words
-      from public.get_lost_pets(100, 0) g
+      from public.get_lost_pets(100, 0, p_country) g
      where g.species = p_species
        and g.lost_on <= current_date
        and (case coalesce(p_scope, 'area')
@@ -482,13 +511,14 @@ $$;
 
 -- Behörigheter för funktionerna: först ta bort allt, sedan ge bara det som behövs
 revoke all on all functions in schema public from public, anon, authenticated;
-grant execute on function public.get_lost_pets(int, int) to anon, authenticated;
-grant execute on function public.search_lost_pets(text, text, int, int) to anon, authenticated;
+grant execute on function public.get_lost_pets(int, int, text) to anon, authenticated;
+grant execute on function public.search_lost_pets(text, text, int, int, text) to anon, authenticated;
 grant execute on function public.get_lost_pet(uuid) to anon, authenticated;
-grant execute on function public.match_lost_pets(text, text, text, text) to anon, authenticated;
+grant execute on function public.match_lost_pets(text, text, text, text, text) to anon, authenticated;
 grant execute on function public.change_username(text) to authenticated;
 grant execute on function public.set_paused(boolean) to authenticated;
-grant execute on function public.report_lost(uuid, text, text, date, text) to authenticated;
+grant execute on function public.report_lost(uuid, text, text, date, text, text, text) to authenticated;
+grant execute on function public.set_home_country(text) to authenticated;
 grant execute on function public.mark_found(uuid) to authenticated;
 grant execute on function public.create_contact_request(uuid, text) to authenticated;
 grant execute on function public.respond_request(uuid, boolean) to authenticated;
