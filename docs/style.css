@@ -71,3 +71,8 @@ nav a.cam span{width:62px;height:62px;border-radius:50%;background:var(--y);bord
 .hero .dots{position:absolute;bottom:10px;left:0;right:0;display:flex;justify-content:center;gap:6px}
 .hero .dots i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.6)}.hero .dots i.on{background:#fff;box-shadow:0 0 0 1px rgba(58,42,30,.25)}
 .hero img{touch-action:pan-y}
+
+.locrow{display:flex;gap:8px;align-items:stretch}.locrow input{flex:1;min-width:0}
+.locbtn{flex:0 0 48px;border:0;border-radius:14px;background:var(--y);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.sug{display:flex;flex-direction:column;margin-top:6px;border-radius:14px;overflow:hidden;background:#fff;border:1.5px solid var(--db)}.sug:empty{display:none}
+.sug button{border:0;background:none;text-align:left;padding:12px 14px;font:inherit;font-weight:700;color:#3A2A1E;border-bottom:1px solid var(--db);cursor:pointer}.sug button:last-child{border-bottom:0}.sug .hint{padding:10px 14px;margin:0}
