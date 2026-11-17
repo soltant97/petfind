@@ -74,10 +74,12 @@ posting:['Sparar …','Saving …'],locNoName:['Kunde inte hitta ortens namn. Sk
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let S={lang:'sv',user:null,unread:0,country:'SE'};
-const COUNTRIES=[{c:'SE',n:['Sverige','Sweden'],bbox:'10.5,55.0,24.3,69.2'},{c:'ES',n:['Spanien','Spain'],bbox:'-9.5,35.9,4.5,43.9'}];
-const cName=c=>{const x=COUNTRIES.find(y=>y.c===c);return x?x.n[S.lang==='en'?1:0]:c};
-const cBox=c=>(COUNTRIES.find(y=>y.c===c)||COUNTRIES[0]).bbox;
-function countrySel(id,val){return `<select id="${id}" aria-label="${esc(t('country'))}">${COUNTRIES.map(x=>`<option value="${x.c}" ${x.c===val?'selected':''}>${esc(x.n[S.lang==='en'?1:0])}</option>`).join('')}</select>`}
+const BBOX={SE:'10.5,55.0,24.3,69.2',ES:'-9.5,35.9,4.5,43.9'};
+const COUNTRIES=('AD AE AF AG AI AL AM AO AR AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BW BY BZ CA CD CF CG CH CI CK CL CM CN CO CR CU CV CW CY CZ DE DJ DK DM DO DZ EC EE EG ER ES ET FI FJ FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GT GU GW GY HK HN HR HT HU ID IE IL IM IN IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MK ML MM MN MO MQ MR MS MT MU MV MW MX MY MZ NA NC NE NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SI SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TG TH TJ TL TM TN TO TR TT TV TW TZ UA UG US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW').split(' ').map(c=>({c}));
+const cNames={};function cName(c){const l=S.lang==='en'?'en':'sv';cNames[l]=cNames[l]||(()=>{try{return new Intl.DisplayNames([l],{type:'region'})}catch(e){return null}})();try{return (cNames[l]&&cNames[l].of(c))||c}catch(e){return c}}
+const cBox=c=>BBOX[c]||'';
+const flag=c=>/^[A-Z]{2}$/.test(c)?String.fromCodePoint(...[...c].map(ch=>127397+ch.charCodeAt(0))):'';
+function countrySel(id,val){const loc=S.lang==='en'?'en':'sv';const list=COUNTRIES.map(x=>({c:x.c,n:cName(x.c)})).sort((x,y)=>x.n.localeCompare(y.n,loc));return `<div class="locrow" style="align-items:center"><span class="flag" id="${id}-flag" aria-hidden="true">${flag(val)}</span><select id="${id}" aria-label="${esc(t('country'))}" style="flex:1;min-width:0">${list.map(x=>`<option value="${x.c}" ${x.c===val?'selected':''}>${flag(x.c)} ${esc(x.n)}</option>`).join('')}</select></div>`}
 try{const l=localStorage.getItem('dh-lang');if(l==='en'||l==='sv')S.lang=l;const c=localStorage.getItem('dh-country');if(c&&COUNTRIES.some(x=>x.c===c))S.country=c}catch(e){}
 const t=k=>(T[k]?T[k][S.lang==='en'?1:0]:k);
 const today=()=>new Date().toISOString().slice(0,10);
@@ -172,7 +174,8 @@ async function rerender(keep){const y=window.scrollY;await route();if(keep)windo
 async function refreshBadge(){if(!S.user){S.unread=0;return}try{S.unread=await DB.unreadCount()}catch(e){}const r=location.hash.replace(/^#\/?/,'').split('/')[0];nav(r==='login'&&S.user?'profile':r)}
 /* ---------- bilder ---------- */
 function shrink(file){return new Promise((ok,no)=>{if(!file.type.startsWith('image/')||file.size>5*1024*1024)return no();const url=URL.createObjectURL(file);const im=new Image();im.onload=()=>{const m=1024,k=Math.min(1,m/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(url);c.toBlob(b=>b?ok({blob:b,url:URL.createObjectURL(b)}):no(),'image/jpeg',.82)};im.onerror=()=>{URL.revokeObjectURL(url);no()};im.src=url})}
-document.addEventListener('change',async e=>{const el=e.target;if(el.id==='bc'){S.country=el.value;S.countryTouched=true;try{localStorage.setItem('dh-country',el.value)}catch(e){}rerender(true);return}
+document.addEventListener('change',async e=>{const el=e.target;if(el.id==='rc'||el.id==='hc'){const f=$('#'+el.id+'-flag');if(f)f.textContent=flag(el.value);return}
+if(el.id==='bc'){S.country=el.value;S.countryTouched=true;try{localStorage.setItem('dh-country',el.value)}catch(e){}rerender(true);return}
 if(el.id==='asp'){tmp.bs={mixed:false,list:[]};renderBreed();return}if(!el.dataset||!el.dataset.file)return;const list=el.dataset.file==='found'?tmp.foundPhotos:tmp.petPhotos;saveFields();for(const f of el.files){try{list.push(await shrink(f))}catch(x){toast(t('badFile'))}}rerender(true)});
 function saveFields(){const v=id=>{const e=document.getElementById(id);return e?e.value:undefined};if(location.hash.startsWith('#/addpet')&&$('#an')){tmp.petForm={name:v('an'),species:v('asp'),breed:buildBreed(),color:v('ac'),sex:v('ase'),age:v('aa'),marks:v('am'),desc:v('ad'),chip:v('ach')}};if(location.hash.startsWith('#/found')){tmp.find=tmp.find||{species:'',place:'',desc:''};if(v('fplace')!==undefined)tmp.find.place=v('fplace');if(v('fdesc')!==undefined)tmp.find.desc=v('fdesc')}}
 const streetOf=a=>a.road?a.road+(a.house_number?' '+a.house_number:''):(a.pedestrian||a.footway||a.path||a.square||'');
@@ -223,7 +226,7 @@ async logout(){await DB.signOut();await loadUser();tmp.next='';location.hash='#/
 function setLostLoc(place,city,country){const label=place===city?place:place+', '+city;tmp.lostLoc={place,city,label,country};const p=$('#lp');if(p)p.value=label;clearSug()}
 function clearSug(){tmp.sugs=[];const e=$('#sug');if(e)e.innerHTML=''}
 let sugTimer,sugCtl,sugLast=0;
-async function searchPlaces(q){const r=await fetch('https://photon.komoot.io/api/?limit=10&bbox='+cBox(S.country)+'&q='+encodeURIComponent(q),{signal:sugCtl.signal});if(!r.ok)throw 0;const seen={},out=[];
+async function searchPlaces(q){const r=await fetch('https://photon.komoot.io/api/?limit=10'+(cBox(S.country)?'&bbox='+cBox(S.country):'')+'&q='+encodeURIComponent(q),{signal:sugCtl.signal});if(!r.ok)throw 0;const seen={},out=[];
 for(const f of (await r.json()).features||[]){const p=f.properties||{};if(!COUNTRIES.some(x=>x.c===p.countrycode))continue;const ty=p.type||'';const a={country_code:p.countrycode};
 if(p.street){a.road=p.street;if(p.housenumber)a.house_number=p.housenumber}else if(ty==='street')a.road=p.name;else if(p.name&&!['city','district','locality','county','state','country','house'].includes(ty))a.pedestrian=p.name;
 a.suburb=p.district||p.locality||(['district','locality'].includes(ty)?p.name:'');a.city=p.city||(ty==='city'?p.name:'')||p.county||'';

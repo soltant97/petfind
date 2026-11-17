@@ -13,7 +13,9 @@ create table if not exists public.profiles (
   paused boolean not null default false,
   created_at timestamptz not null default now()
 );
-alter table public.profiles add column if not exists home_country text not null default 'SE' check (home_country in ('SE','ES'));
+alter table public.profiles add column if not exists home_country text not null default 'SE';
+alter table public.profiles drop constraint if exists profiles_home_country_check;
+alter table public.profiles add constraint profiles_home_country_check check (home_country ~ '^[A-Z]{2}$');
 create unique index if not exists profiles_username_ci on public.profiles (lower(username));
 
 create or replace function public.generate_username() returns text
@@ -34,7 +36,7 @@ language plpgsql security definer set search_path = '' as $$
 begin
   insert into public.profiles (id, username, home_country)
   values (new.id, public.generate_username(),
-          case when upper(coalesce(new.raw_user_meta_data ->> 'home_country', '')) in ('SE','ES')
+          case when upper(coalesce(new.raw_user_meta_data ->> 'home_country', '')) ~ '^[A-Z]{2}$'
                then upper(new.raw_user_meta_data ->> 'home_country') else 'SE' end);
   return new;
 end $$;
@@ -84,7 +86,9 @@ create table if not exists public.lost_reports (
   created_at timestamptz not null default now(),
   archived_at timestamptz
 );
-alter table public.lost_reports add column if not exists country_code text not null default 'SE' check (country_code in ('SE','ES'));
+alter table public.lost_reports add column if not exists country_code text not null default 'SE';
+alter table public.lost_reports drop constraint if exists lost_reports_country_code_check;
+alter table public.lost_reports add constraint lost_reports_country_code_check check (country_code ~ '^[A-Z]{2}$');
 create unique index if not exists lost_reports_one_active on public.lost_reports(pet_id) where status = 'active';
 create index if not exists lost_reports_active_idx on public.lost_reports(status);
 
@@ -299,7 +303,7 @@ drop function if exists public.match_lost_pets(text, text, text, text);
 create or replace function public.set_home_country(p_country text) returns void
 language plpgsql security definer set search_path = '' as $$
 begin
-  if upper(coalesce(p_country, '')) not in ('SE','ES') then raise exception 'Landet stöds inte'; end if;
+  if upper(coalesce(p_country, '')) !~ '^[A-Z]{2}$' then raise exception 'Landet stöds inte'; end if;
   update public.profiles set home_country = upper(p_country) where id = auth.uid();
 end $$;
 
@@ -312,7 +316,7 @@ begin
   if not exists (select 1 from public.pets where id = p_pet and owner_id = auth.uid()) then
     raise exception 'Djuret finns inte eller är inte ditt';
   end if;
-  if upper(coalesce(p_country, '')) not in ('SE','ES') then raise exception 'Landet stöds inte'; end if;
+  if upper(coalesce(p_country, '')) !~ '^[A-Z]{2}$' then raise exception 'Landet stöds inte'; end if;
   if upper(p_country) is distinct from upper(coalesce(p_device_country, '')) then
     raise exception 'Platstjänster måste vara på och platsen måste ligga i landet där du befinner dig';
   end if;
