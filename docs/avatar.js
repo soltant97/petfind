@@ -6,30 +6,35 @@
   const FUR = { cat: '#D9955A', dog: '#C69463', rabbit: '#F5EADB', fox: '#E5763F', bear: '#946447', panda: '#FFFCF5', mouse: '#C4BAB0', bird: '#FFD23F', hamster: '#E8B77A', guineapig: '#C98B5A', parrot: '#E5483B', chicken: '#FFFCF5', squirrel: '#C9783C', zebra: '#FFFCF5', horse: '#A66A3F', lion: '#F0B259', monkey: '#8A5A3C', pig: '#F6B3B0', cow: '#FFFCF5', tiger: '#F08A2E' };
   const re = /^(cat|dog|rabbit|fox|bear|panda|mouse|bird|hamster|guineapig|parrot|chicken|squirrel|zebra|horse|lion|monkey|pig|cow|tiger):[0-7]:[0-9](:(?:[0-9]|1[0-5]))?$/;
   const ok = (c) => re.test(c || '');
-  const random = () => ANIMALS[Math.floor(Math.random() * ANIMALS.length)] + ':' + Math.floor(Math.random() * 8) + ':' + Math.floor(Math.random() * 4) + (Math.random() < 0.5 ? '' : ':' + (1 + Math.floor(Math.random() * 15)));
+  const random = () => { const a = ANIMALS[Math.floor(Math.random() * ANIMALS.length)], fl = furFor(a), fu = fl[Math.floor(Math.random() * fl.length)]; return a + ':' + Math.floor(Math.random() * 8) + ':' + Math.floor(Math.random() * 4) + (fu ? ':' + fu : ''); };
   const code = (c) => c.a + ':' + c.b + ':' + c.x + (c.c ? ':' + c.c : '');
   const parse = (c) => { const p = (ok(c) ? c : 'cat:0:0').split(':'); return { a: p[0], b: +p[1], x: +p[2], c: p[3] ? +p[3] : 0 }; };
+  const TOKEN = '#FE00FE';
   const FURS = [null,
     { c: '#FFFCF5', sv: 'Vit', en: 'White' }, { c: '#3B3431', sv: 'Svart', en: 'Black' }, { c: '#A8A29E', sv: 'Grå', en: 'Grey' },
     { c: '#946447', sv: 'Brun', en: 'Brown' }, { c: '#D9A66E', sv: 'Ljusbrun', en: 'Light brown' }, { c: '#F1DDBA', sv: 'Gräddvit', en: 'Cream' },
     { c: '#F08A2E', sv: 'Orange', en: 'Orange' }, { c: '#FFD23F', sv: 'Gul', en: 'Yellow' }, { c: '#D8453A', sv: 'Röd', en: 'Red' },
     { c: '#F4806B', sv: 'Korall', en: 'Coral' }, { c: '#F4A9C0', sv: 'Rosa', en: 'Pink' }, { c: '#A98BD9', sv: 'Lila', en: 'Purple' },
     { c: '#5B9BE0', sv: 'Blå', en: 'Blue' }, { c: '#4FC1C0', sv: 'Turkos', en: 'Turquoise' }, { c: '#7DB86A', sv: 'Grön', en: 'Green' }];
+  const furFor = () => FURS.map((_, i) => i);
   const h2r = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
   const lum = (h) => { const [r, g, b] = h2r(h).map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4))); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
   const toHsl = (h) => { const [r, g, b] = h2r(h), mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2; let hh = 0, s = 0; if (mx !== mn) { const d = mx - mn; s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); hh = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; hh /= 6; } return [hh, s, l]; };
   const fromHsl = (h, s, l) => { const f = (n) => { const k = (n + h * 12) % 12, a = s * Math.min(l, 1 - l); return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); }; return '#' + [f(0), f(8), f(4)].map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join(''); };
   const tone = (c, dl) => { const [h, s, l] = toHsl(c); return fromHsl(h, s, Math.max(0.06, Math.min(0.94, l + dl))); };
   /* Andra färgen i tvåfärgade djur (panda, zebra, ko, tiger): samma nyans men tydligt mörkare eller ljusare */
-  const contrast = (c) => { const [h, s, l] = toHsl(c); return lum(c) > 0.4 ? fromHsl(h, Math.min(s, 0.45), 0.2) : fromHsl(h, Math.min(s, 0.5), 0.9); };
-  const face = (a, fur) => {
+  const contrast = (c) => { const [h, s, l] = toHsl(c); return lum(c) > 0.3 ? fromHsl(h, Math.min(s, 0.45), 0.2) : fromHsl(h, Math.min(s, 0.5), 0.9); };
+  const faceRaw = (a, fur) => {
     const nat = !fur;
-    const f = nat ? FUR[a] : FURS[fur].c;
-    const D = !nat && lum(f) < 0.2 ? '#F3E6D8' : '#3A2A1E';
-    const p2 = nat ? '#3A2A1E' : contrast(f);
+    const fc = nat ? FUR[a] : FURS[fur].c;
+    const f = nat ? fc : TOKEN;
+    const D = !nat && lum(fc) < 0.1 ? '#F3E6D8' : '#3A2A1E';
+    const p2 = nat ? '#3A2A1E' : contrast(fc);
     const pe = lum(p2) < 0.4 ? '#FFFCF5' : '#3A2A1E';
-    const tn = (o, dl) => (nat ? o : tone(f, dl));
-    const dk3 = nat ? '#3A2A1E' : tone(f, -0.3);
+    const tn = (o, dl) => (nat ? o : lum(fc) < 0.15 && dl < 0 ? tone(fc, -dl + 0.06) : tone(fc, dl));
+    const mz = nat ? '#CDBFAE' : lum(fc) < 0.12 ? tone(fc, 0.14) : tone(fc, -0.12);
+    const nz = lum(mz) < 0.3 ? '#F3E6D8' : '#3A2A1E';
+    const dk3 = nat ? '#3A2A1E' : lum(fc) < 0.15 ? tone(fc, 0.3) : tone(fc, -0.3);
     const eyes = `<circle cx="39" cy="54" r="3.4" fill="${D}"/><circle cx="61" cy="54" r="3.4" fill="${D}"/>`;
     const mouth = `<path d="M44 66q6 5 12 0" fill="none" stroke="${D}" stroke-width="2.4" stroke-linecap="round"/>`;
     const nose = `<ellipse cx="50" cy="62" rx="4" ry="3" fill="${D}"/>`;
@@ -47,7 +52,7 @@
       case 'parrot': return `<ellipse cx="42" cy="22" rx="5" ry="11" fill="#3B7DD8" transform="rotate(-18 42 22)"/><ellipse cx="50" cy="19" rx="5" ry="12" fill="#F4C542"/><ellipse cx="58" cy="22" rx="5" ry="11" fill="#3B7DD8" transform="rotate(18 58 22)"/><circle cx="50" cy="55" r="30" fill="${f}"/><ellipse cx="37" cy="52" rx="11" ry="10" fill="#FFFCF5"/><ellipse cx="63" cy="52" rx="11" ry="10" fill="#FFFCF5"/><circle cx="39" cy="52" r="3.400" fill="${D}"/><circle cx="61" cy="52" r="3.400" fill="${D}"/><path d="M41 62Q50 54 59 62Q58 80 50 82Q42 80 41 62Z" fill="#F4C542"/><path d="M45 70h10" stroke="${D}" stroke-width="2" stroke-linecap="round"/>`;
       case 'chicken': return `<circle cx="41" cy="27" r="7" fill="#E5483B"/><circle cx="50" cy="22" r="8" fill="#E5483B"/><circle cx="59" cy="27" r="7" fill="#E5483B"/><circle cx="50" cy="56" r="29" fill="${f}" stroke="#E9DCC8" stroke-width="2"/><ellipse cx="50" cy="79" rx="4.500" ry="7" fill="#E5483B"/><path d="M42 60L58 60L50 73Z" fill="#F4A24D"/>${eyes}`;
       case 'squirrel': return `<ellipse cx="84" cy="44" rx="13" ry="26" fill="${tn('#A85F2C',-0.12)}" transform="rotate(14 84 44)"/><path d="M24 40L28 14L46 30Z M76 40L72 14L54 30Z" fill="${f}"/>${head}<ellipse cx="50" cy="66" rx="13" ry="10" fill="#F8E6CC"/>${eyes}<ellipse cx="50" cy="62" rx="3.600" ry="2.800" fill="${D}"/><path d="M45 69q5 4 10 0" fill="none" stroke="${D}" stroke-width="2.200" stroke-linecap="round"/><rect x="46.500" y="70" width="3.500" height="6" rx="1" fill="#FFFCF5" stroke="${D}" stroke-width="1"/><rect x="50" y="70" width="3.500" height="6" rx="1" fill="#FFFCF5" stroke="${D}" stroke-width="1"/>`;
-      case 'zebra': return `<path d="M30 8L40 36L22 34Z M70 8L78 34L60 36Z" fill="${p2}"/><path d="M38 10l-3 16M33 12l-5 14M62 10l3 16M67 12l5 14" stroke="#FFFCF5" stroke-width="2"/><ellipse cx="50" cy="54" rx="27" ry="31" fill="${f}" stroke="#E9DCC8" stroke-width="2"/><path d="M50 26v16M40 28l3 14M60 28l-3 14M23 50l9 4M24 60l9 3M77 50l-9 4M76 60l-9 3" stroke="${p2}" stroke-width="4" stroke-linecap="round"/>${eyes}<ellipse cx="50" cy="70" rx="14" ry="11" fill="${tn('#CDBFAE',-0.12)}"/><circle cx="44" cy="70" r="2.200" fill="${D}"/><circle cx="56" cy="70" r="2.200" fill="${D}"/>`;
+      case 'zebra': return `<path d="M30 8L40 36L22 34Z M70 8L78 34L60 36Z" fill="${nat ? p2 : f}"/><path d="M38 10l-3 16M33 12l-5 14M62 10l3 16M67 12l5 14" stroke="${nat ? '#FFFCF5' : p2}" stroke-width="2"/><ellipse cx="50" cy="54" rx="27" ry="31" fill="${f}" stroke="${tn('#E9DCC8', -0.1)}" stroke-width="2"/><path d="M50 26v16M40 28l3 14M60 28l-3 14M23 50l9 4M24 60l9 3M77 50l-9 4M76 60l-9 3" stroke="${p2}" stroke-width="4" stroke-linecap="round"/>${eyes}<ellipse cx="50" cy="70" rx="14" ry="11" fill="${mz}"/><circle cx="44" cy="70" r="2.200" fill="${nz}"/><circle cx="56" cy="70" r="2.200" fill="${nz}"/>`;
       case 'horse': return `<path d="M28 6L40 34L22 32Z M72 6L78 32L60 34Z" fill="${f}"/><path d="M34 6Q50 0 66 6L64 30Q50 22 36 30Z" fill="${tn('#5A3A22',-0.28)}"/><ellipse cx="50" cy="55" rx="26" ry="31" fill="${f}"/><ellipse cx="50" cy="44" rx="4.500" ry="16" fill="#FFFCF5"/><ellipse cx="50" cy="72" rx="14" ry="11" fill="${tn('#C98F66',0.1)}"/><circle cx="44" cy="72" r="2.200" fill="${D}"/><circle cx="56" cy="72" r="2.200" fill="${D}"/><circle cx="38" cy="52" r="3.400" fill="${D}"/><circle cx="62" cy="52" r="3.400" fill="${D}"/>`;
       case 'lion': return `<circle cx="50" cy="54" r="40" fill="${tn('#B8651F',-0.3)}"/><circle cx="50" cy="54" r="35" fill="${tn('#C9772B',-0.2)}"/><circle cx="27" cy="30" r="9" fill="${f}"/><circle cx="73" cy="30" r="9" fill="${f}"/><circle cx="50" cy="55" r="27" fill="${f}"/><ellipse cx="50" cy="67" rx="13" ry="10" fill="#FBE7C4"/>${eyes}<path d="M44 59h12l-6 7Z" fill="#7A3E2A"/><path d="M50 66v3M44 71q6 4 12 0" fill="none" stroke="${D}" stroke-width="2.200" stroke-linecap="round"/>`;
       case 'monkey': return `<circle cx="18" cy="55" r="11" fill="${f}"/><circle cx="82" cy="55" r="11" fill="${f}"/><circle cx="18" cy="55" r="6" fill="#E8C9A0"/><circle cx="82" cy="55" r="6" fill="#E8C9A0"/><circle cx="50" cy="52" r="30" fill="${f}"/><ellipse cx="38" cy="52" rx="13" ry="12" fill="#F1D3AE"/><ellipse cx="62" cy="52" rx="13" ry="12" fill="#F1D3AE"/><ellipse cx="50" cy="66" rx="17" ry="13" fill="#F1D3AE"/><circle cx="39" cy="52" r="3.400" fill="${D}"/><circle cx="61" cy="52" r="3.400" fill="${D}"/><circle cx="46" cy="63" r="1.600" fill="${D}"/><circle cx="54" cy="63" r="1.600" fill="${D}"/><path d="M42 70q8 6 16 0" fill="none" stroke="${D}" stroke-width="2.400" stroke-linecap="round"/>`;
@@ -56,6 +61,18 @@
       case 'tiger': return `<circle cx="24" cy="32" r="11" fill="${f}"/><circle cx="76" cy="32" r="11" fill="${f}"/><circle cx="24" cy="32" r="5.500" fill="#FFE3DC"/><circle cx="76" cy="32" r="5.500" fill="#FFE3DC"/>${head}<ellipse cx="50" cy="67" rx="14" ry="10" fill="#FFFCF5"/><path d="M50 28v11M42 29l3 10M58 29l-3 10M21 52l10 3M21 61l10 2M79 52l-10 3M79 61l-10 2" stroke="${p2}" stroke-width="3.600" stroke-linecap="round"/>${eyes}<path d="M45 60h10l-5 6Z" fill="#E88A8A"/><path d="M50 66v3M45 71q5 3 10 0" fill="none" stroke="${D}" stroke-width="2.200" stroke-linecap="round"/>`;
       default: return `<path d="M44 26Q50 10 56 26Z" fill="${f}"/><circle cx="50" cy="55" r="29" fill="${f}"/><path d="M42 60L58 60L50 72Z" fill="#F4A24D"/>${eyes}`;
     }
+  };
+  /* Små detaljer (inre öron, nos, näbb, kam, nosparti …) byter ton om de annars skulle smälta in i djurets färg. */
+  const ACCENTS = ['#F4A9A0', '#F4A9C0', '#E8838A', '#E88A8A', '#F4A24D', '#E5483B', '#F29A98', '#EE9A98', '#F6B3B0', '#FFE3DC', '#F3DFC6', '#F8E6CC', '#F4C542', '#C99A78', '#E8C9A8', '#FBE7C4', '#F1D3AE', '#E8C9A0', '#C98F66'];
+  const dist = (x, y) => { const a = h2r(x), b = h2r(y); return Math.sqrt(a.reduce((s, v, i) => s + Math.pow((v - b[i]) * 255, 2), 0)); };
+  const accent = (o, fc) => (dist(o, fc) < 95 ? (lum(fc) < 0.2 ? tone(fc, 0.32) : lum(o) > lum(fc) ? tone(fc, 0.22) : tone(fc, -0.22)) : o);
+  const face = (a, fur) => {
+    const s = faceRaw(a, fur);
+    if (!fur) return s;
+    const fc = FURS[fur].c;
+    let out = s;
+    ACCENTS.forEach((h) => { if (out.indexOf(h) >= 0) out = out.split(h).join(accent(h, fc)); });
+    return out.split(TOKEN).join(fc);
   };
   const ACCV = { 1: '46 72 32 24', 2: '28 42 44 24', 3: '18 74 64 34', 4: '22 42 56 24', 5: '26 0 48 30', 6: '28 0 48 36', 7: '10 12 80 58', 8: '60 12 24 24' };
   const acc = (x) => {
@@ -80,5 +97,5 @@
     const p = parse(code), s = size || 40;
     return `<span class="av" style="width:${s}px;height:${s}px" role="img" aria-label="${label || 'Avatar'}"><svg viewBox="0 0 100 100" width="${s}" height="${s}" aria-hidden="true"><rect width="100" height="100" fill="${COLORS[p.b]}"/>${face(p.a, p.c)}${acc(p.x)}</svg></span>`;
   }
-  window.AVATAR = { ANIMALS, COLORS, FURS, FUR, BGS: [0, 1, 2, 3, 4, 5, 7], ACCS: [0, 1, 2, 3, 4, 5, 6, 7, 8], random, parse, code, ok, svg, accSvg };
+  window.AVATAR = { ANIMALS, COLORS, FURS, FUR, BGS: [0, 1, 2, 3, 4, 5, 7], ACCS: [0, 1, 2, 3, 4, 5, 6, 7, 8], random, parse, code, ok, svg, accSvg, furFor };
 })();
