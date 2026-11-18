@@ -181,3 +181,4 @@ body.inchat .chatbg>:first-child{margin-top:auto}
 .fsec{display:flex;align-items:center;gap:8px;width:100%;padding:12px 14px;border:1.5px solid var(--bd,#E9DCC8);border-radius:16px;background:var(--w);font:inherit;font-weight:800;color:var(--t);cursor:pointer;text-align:left}.fsec span{flex:1}.fsec small{color:var(--m);font-weight:700}.fsec.open{border-color:#FFD770}.fsecbody{margin:8px 0 0}
 .filtersec{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:50px;padding:12px 14px;border-radius:16px;font-size:16px;font-weight:800;border:1.5px solid var(--db)}.filtersec.on{border-color:#FFD770}.filtersec svg{width:20px;height:20px}
 .cdot{display:inline-block;width:14px;height:14px;border-radius:50%;margin-right:7px;vertical-align:-2px;border:1.5px solid rgba(58,42,30,.35)}
+.ownerrow{display:flex;align-items:center;gap:10px;margin:12px 0;font-size:16px}
