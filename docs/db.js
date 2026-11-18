@@ -3,7 +3,7 @@
    databasen validerar ägare, avsändare och behörighet. */
 (function () {
   const cfg = window.DH_CONFIG;
-  const sb = window.supabase.createClient(cfg.url, cfg.key);
+  const sb = window.supabase.createClient(cfg.url, cfg.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storage: window.localStorage } });
   const BUCKET = 'pet-photos';
   const urlCache = new Map();
   const ok = (r) => { if (r.error) throw r.error; return r.data; };
