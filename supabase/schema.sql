@@ -13,6 +13,7 @@ create table if not exists public.profiles (
   paused boolean not null default false,
   created_at timestamptz not null default now()
 );
+alter table public.profiles add column if not exists notif_off text[] not null default '{}';
 alter table public.profiles add column if not exists home_country text not null default 'SE';
 alter table public.profiles drop constraint if exists profiles_home_country_check;
 alter table public.profiles add constraint profiles_home_country_check check (home_country ~ '^[A-Z]{2}$');
@@ -36,7 +37,6 @@ begin
   if p_avatar !~ '^(cat|dog|rabbit|fox|bear|panda|mouse|bird):[0-7]:[0-3]$' then raise exception 'Ogiltig avatar'; end if;
   update public.profiles set avatar = p_avatar where id = auth.uid();
 end $$;
-grant execute on function public.set_avatar(text) to authenticated;
 
 create or replace function public.generate_username() returns text
 language plpgsql set search_path = '' as $$
@@ -209,6 +209,20 @@ create table if not exists public.notifications (
   created_at timestamptz not null default now(),
   read_at timestamptz
 );
+alter table public.notifications add column if not exists found_id uuid references public.found_reports(id) on delete cascade;
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in ('request','accepted','declined','message','match','closed'));
+-- Avstängda notistyper (profiles.notif_off) skapas aldrig alls
+create or replace function public.notif_respect_prefs() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if exists (select 1 from public.profiles where id = new.user_id and new.type = any(notif_off)) then return null; end if;
+  return new;
+end $$;
+drop trigger if exists notifications_prefs on public.notifications;
+create trigger notifications_prefs before insert on public.notifications
+  for each row execute function public.notif_respect_prefs();
 create index if not exists notifications_user_idx on public.notifications(user_id, created_at desc);
 
 -- =====================================================================
@@ -587,6 +601,16 @@ begin
     values (auth.uid(), p_species, nullif(trim(p_color), ''), trim(p_place), trim(p_city), upper(p_country),
             nullif(trim(p_desc), ''), p_paths, true)
     returning id into v_id;
+  -- möjlig träff: aktiva borttappade djur av samma djurslag i samma land (en notis per ägare)
+  insert into public.notifications (user_id, type, found_id, pet_name)
+    select distinct on (p.owner_id) p.owner_id, 'match', v_id, p.name
+      from public.pets p
+      join public.lost_reports lr on lr.pet_id = p.id and lr.status = 'active' and lr.country_code = upper(p_country)
+      join public.profiles pr on pr.id = p.owner_id and not pr.paused
+     where p.status = 'lost' and p.species = p_species and p.owner_id <> auth.uid()
+       and not exists (select 1 from public.blocks b
+                        where (b.blocker_id = p.owner_id and b.blocked_id = auth.uid()) or (b.blocker_id = auth.uid() and b.blocked_id = p.owner_id))
+     order by p.owner_id, p.created_at;
   return v_id;
 end $$;
 
@@ -596,7 +620,27 @@ language plpgsql security definer set search_path = '' as $$
 begin
   update public.found_reports set closed_at = now() where id = p_id and finder_id = auth.uid() and closed_at is null;
   if not found then raise exception 'Anmälan finns inte eller är redan stängd'; end if;
+  insert into public.notifications (user_id, type, request_id, pet_name)
+    select cr.finder_id, 'closed', cr.id, cr.pet_name from public.contact_requests cr
+     where cr.found_id = p_id and cr.status in ('pending','accepted') and cr.finder_id is not null;
 end $$;
+
+-- Notisinställningar (på/av per typ). Läses och ändras bara av användaren själv.
+create or replace function public.get_notif_off() returns text[]
+language sql stable security definer set search_path = '' as $$
+  select coalesce(notif_off, '{}') from public.profiles where id = auth.uid();
+$$;
+create or replace function public.set_notif_pref(p_type text, p_on boolean) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Inte inloggad'; end if;
+  if p_type not in ('message','request','accepted','declined','match','closed') then raise exception 'Okänd notistyp'; end if;
+  update public.profiles
+     set notif_off = case when p_on then array_remove(notif_off, p_type)
+                          else (select coalesce(array_agg(distinct x), '{}') from unnest(notif_off || p_type) x) end
+   where id = auth.uid();
+end $$;
+
 
 create or replace function public.get_found_pets(p_limit int default 50, p_offset int default 0, p_country text default null)
 returns table (id uuid, species text, color text, place text, city text, found_on date, description text,
@@ -689,6 +733,9 @@ language sql security definer set search_path = '' as $$
 $$;
 grant execute on function public.block_user(uuid) to authenticated;
 grant execute on function public.unblock_user(uuid) to authenticated;
+grant execute on function public.set_avatar(text) to authenticated;
+grant execute on function public.get_notif_off() to authenticated;
+grant execute on function public.set_notif_pref(text, boolean) to authenticated;
 grant execute on function public.delete_my_account() to authenticated;
 
 -- =====================================================================

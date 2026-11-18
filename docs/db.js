@@ -200,7 +200,9 @@
     async blockedIds() { return ok(await sb.from('blocks').select('blocked_id')).map((x) => x.blocked_id); },
     async blockedList() { return ok(await sb.from('blocks').select('blocked_id,created_at,blocked:profiles!blocked_id(username,avatar)').order('created_at', { ascending: false })); },
     async unblock(userId) { ok(await sb.rpc('unblock_user', { p_user: userId })); },
-    async notifications() { return ok(await sb.from('notifications').select('id,type,request_id,pet_name,created_at,read_at').order('created_at', { ascending: false }).limit(50)); },
+    async notifications() { return ok(await sb.from('notifications').select('id,type,request_id,found_id,pet_name,created_at,read_at').order('created_at', { ascending: false }).limit(50)); },
+    async notifOff() { const r = await sb.rpc('get_notif_off'); return r.error ? [] : (r.data || []); },
+    async setNotifPref(type, on) { ok(await sb.rpc('set_notif_pref', { p_type: type, p_on: on })); },
     async markAllNotifs() { ok(await sb.from('notifications').update({ read_at: new Date().toISOString() }).is('read_at', null)); },
     async unreadCount() {
       const r = await sb.from('notifications').select('id', { count: 'exact', head: true }).is('read_at', null);
