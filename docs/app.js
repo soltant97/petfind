@@ -79,7 +79,7 @@ const COUNTRIES=('AD AE AF AG AI AL AM AO AR AT AU AW AX AZ BA BB BD BE BF BG BH
 const cNames={};function cName(c){const l=S.lang==='en'?'en':'sv';cNames[l]=cNames[l]||(()=>{try{return new Intl.DisplayNames([l],{type:'region'})}catch(e){return null}})();try{return (cNames[l]&&cNames[l].of(c))||c}catch(e){return c}}
 const cBox=c=>BBOX[c]||'';
 const flag=c=>/^[A-Z]{2}$/.test(c)?String.fromCodePoint(...[...c].map(ch=>127397+ch.charCodeAt(0))):'';
-function countrySel(id,val){const loc=S.lang==='en'?'en':'sv';const list=COUNTRIES.map(x=>({c:x.c,n:cName(x.c)})).sort((x,y)=>x.n.localeCompare(y.n,loc));return `<div class="locrow" style="align-items:center"><span class="flag" id="${id}-flag" aria-hidden="true">${flag(val)}</span><select id="${id}" aria-label="${esc(t('country'))}" style="flex:1;min-width:0">${list.map(x=>`<option value="${x.c}" ${x.c===val?'selected':''}>${flag(x.c)} ${esc(x.n)}</option>`).join('')}</select></div>`}
+function countrySel(id,val){const loc=S.lang==='en'?'en':'sv';const list=COUNTRIES.map(x=>({c:x.c,n:cName(x.c)})).sort((x,y)=>x.n.localeCompare(y.n,loc));return `<select id="${id}" aria-label="${esc(t('country'))}">${list.map(x=>`<option value="${x.c}" ${x.c===val?'selected':''}>${flag(x.c)} ${esc(x.n)}</option>`).join('')}</select>`}
 try{const l=localStorage.getItem('dh-lang');if(l==='en'||l==='sv')S.lang=l;const c=localStorage.getItem('dh-country');if(c&&COUNTRIES.some(x=>x.c===c))S.country=c}catch(e){}
 const t=k=>(T[k]?T[k][S.lang==='en'?1:0]:k);
 const today=()=>new Date().toISOString().slice(0,10);
