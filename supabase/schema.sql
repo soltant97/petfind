@@ -782,6 +782,15 @@ language sql stable security definer set search_path = '' as $$
   where lower(pr.username) = lower(p_username) and not pr.paused;
 $$;
 
+-- Offentlig lista över en användares djur: bara djurslag och namn (aldrig chipnummer eller annat)
+create or replace function public.get_user_pets(p_user uuid)
+returns table (species text, name text, status text)
+language sql stable security definer set search_path = '' as $$
+  select p.species, p.name, p.status from public.pets p
+  join public.profiles pr on pr.id = p.owner_id and not pr.paused
+  where p.owner_id = p_user order by p.created_at;
+$$;
+
 -- Blockera en användare direkt (från användarsidan). Väntande förfrågningar mellan er återkallas.
 create or replace function public.block_user_by_id(p_user uuid) returns void
 language plpgsql security definer set search_path = '' as $$
@@ -841,6 +850,7 @@ grant execute on function public.block_user(uuid) to authenticated;
 grant execute on function public.unblock_user(uuid) to authenticated;
 grant execute on function public.attach_request_photos(uuid, text[]) to authenticated;
 grant execute on function public.get_user_card(text) to authenticated;
+grant execute on function public.get_user_pets(uuid) to authenticated;
 grant execute on function public.set_chat_muted(uuid, boolean) to authenticated;
 grant execute on function public.block_user_by_id(uuid) to authenticated;
 grant execute on function public.report_user(uuid, text, text) to authenticated;
