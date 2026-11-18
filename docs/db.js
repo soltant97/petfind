@@ -48,10 +48,11 @@
     async session() { return (await sb.auth.getSession()).data.session; },
     async profile() {
       const s = await DB.session(); if (!s) return null;
-      let r = await sb.from('profiles').select('id,username,paused,home_country').eq('id', s.user.id).maybeSingle();
+      let r = await sb.from('profiles').select('id,username,paused,home_country,avatar').eq('id', s.user.id).maybeSingle();
+      if (r.error) r = await sb.from('profiles').select('id,username,paused,home_country').eq('id', s.user.id).maybeSingle();
       if (r.error) r = await sb.from('profiles').select('id,username,paused').eq('id', s.user.id).maybeSingle(); // databasen saknar ännu landsfunktionen
       const d = ok(r);
-      return d ? { id: d.id, name: d.username, paused: d.paused, country: d.home_country || 'SE', email: s.user.email } : null;
+      return d ? { id: d.id, name: d.username, paused: d.paused, country: d.home_country || 'SE', avatar: d.avatar || '', email: s.user.email } : null;
     },
     onAuth(cb) { return sb.auth.onAuthStateChange((ev, session) => cb(ev, session)); },
     async signUp(email, password, country) { const r = await sb.auth.signUp({ email, password, options: { data: { home_country: country || 'SE' } } }); if (r.error) throw r.error; return r.data; },
@@ -59,6 +60,18 @@
     async signOut() { await sb.auth.signOut(); },
     async resetPassword(email) { const r = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname }); if (r.error) throw r.error; },
     async setPassword(pw) { const r = await sb.auth.updateUser({ password: pw }); if (r.error) throw r.error; },
+    /* avatarer är offentliga (inga personuppgifter); hämtas per användarnamn och cachas */
+    avCache: {},
+    async avatarsOf(names) {
+      const need = [...new Set((names || []).filter((n) => n && !(n in DB.avCache)))];
+      if (need.length) {
+        const r = await sb.from('profiles').select('username,avatar').in('username', need);
+        if (!r.error) (r.data || []).forEach((x) => { DB.avCache[x.username] = x.avatar || ''; });
+        need.forEach((n) => { if (!(n in DB.avCache)) DB.avCache[n] = ''; });
+      }
+      return DB.avCache;
+    },
+    async setAvatar(code, myName) { ok(await sb.rpc('set_avatar', { p_avatar: code })); if (myName) DB.avCache[myName] = code; },
     async changeUsername(n) { ok(await sb.rpc('change_username', { new_name: n })); },
     async setPaused(v) { ok(await sb.rpc('set_paused', { p_paused: v })); },
     async deleteAccount() {
@@ -172,7 +185,7 @@
     },
     /* ----- kontakt och chatt ----- */
     async requests() {
-      let r = await sb.from('contact_requests').select('id,pet_id,found_id,pet_name,finder_id,owner_id,intro,status,created_at,finder:profiles!finder_id(username),owner:profiles!owner_id(username)').order('created_at', { ascending: false });
+      let r = await sb.from('contact_requests').select('id,pet_id,found_id,pet_name,finder_id,owner_id,intro,status,created_at,finder:profiles!finder_id(username,avatar),owner:profiles!owner_id(username,avatar)').order('created_at', { ascending: false });
       if (r.error) r = await sb.from('contact_requests').select('id,pet_id,pet_name,finder_id,owner_id,intro,status,created_at,finder:profiles!finder_id(username),owner:profiles!owner_id(username)').order('created_at', { ascending: false });
       return ok(r);
     },

@@ -95,3 +95,13 @@ select:disabled{opacity:.6}
 .empty svg{margin-bottom:10px}
 .empty b{font-size:18px;font-weight:800;color:#3A2A1E}
 .empty span{font-size:15px;font-weight:600;color:#7A6552}
+.av{display:inline-block;flex:none;border-radius:50%;overflow:hidden;background:var(--b);box-shadow:0 0 0 2px var(--w)}
+.av svg{display:block}
+.uchip{display:inline-flex;align-items:center;gap:8px;font-weight:800;max-width:100%}
+.uchip b{overflow:hidden;text-overflow:ellipsis}
+.avgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:6px}
+.avgrid button{border:2px solid transparent;border-radius:16px;background:transparent;padding:4px;cursor:pointer;display:flex;justify-content:center;min-height:44px}
+.avgrid button.on{border-color:var(--t);background:var(--lc)}
+.swatches{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.swatches button{width:44px;height:44px;border-radius:50%;border:2px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(58,42,30,.2)}
+.swatches button.on{border-color:var(--t)}

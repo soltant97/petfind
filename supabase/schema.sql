@@ -18,6 +18,26 @@ alter table public.profiles drop constraint if exists profiles_home_country_chec
 alter table public.profiles add constraint profiles_home_country_check check (home_country ~ '^[A-Z]{2}$');
 create unique index if not exists profiles_username_ci on public.profiles (lower(username));
 
+-- Avatar (djur) – genereras på servern, kan ändras av användaren. Format 'djur:bakgrund:tillbehör', t.ex. 'fox:3:1'.
+create or replace function public.random_avatar() returns text
+language sql volatile set search_path = '' as $$
+  select (array['cat','dog','rabbit','fox','bear','panda','mouse','bird'])[1 + floor(random() * 8)::int]
+         || ':' || floor(random() * 8)::int::text || ':' || floor(random() * 4)::int::text
+$$;
+alter table public.profiles add column if not exists avatar text not null default public.random_avatar();
+alter table public.profiles drop constraint if exists profiles_avatar_check;
+alter table public.profiles add constraint profiles_avatar_check
+  check (avatar ~ '^(cat|dog|rabbit|fox|bear|panda|mouse|bird):[0-7]:[0-3]$');
+
+create or replace function public.set_avatar(p_avatar text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Inte inloggad'; end if;
+  if p_avatar !~ '^(cat|dog|rabbit|fox|bear|panda|mouse|bird):[0-7]:[0-3]$' then raise exception 'Ogiltig avatar'; end if;
+  update public.profiles set avatar = p_avatar where id = auth.uid();
+end $$;
+grant execute on function public.set_avatar(text) to authenticated;
+
 create or replace function public.generate_username() returns text
 language plpgsql set search_path = '' as $$
 declare names text[] := array['Misse','Luna','Findus','Pelle','Molly','Bella','Tott','Saga','Ludde','Sixten'];
@@ -208,7 +228,7 @@ alter table public.notifications enable row level security;
 revoke all on all tables in schema public from anon, authenticated;
 
 -- profiles: användarnamn är offentligt (inga personuppgifter finns i tabellen). Ändras bara via funktioner.
-grant select (id, username) on public.profiles to anon, authenticated;
+grant select (id, username, avatar) on public.profiles to anon, authenticated;
 grant select (paused, home_country) on public.profiles to authenticated;
 drop policy if exists profiles_read on public.profiles;
 create policy profiles_read on public.profiles for select using (true);
