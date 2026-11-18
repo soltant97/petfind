@@ -296,6 +296,7 @@ $$;
 drop function if exists public.report_lost(uuid, text, text, date, text);
 drop function if exists public.get_lost_pets(int, int);
 drop function if exists public.search_lost_pets(text, text, int, int);
+drop function if exists public.search_lost_pets(text, text, int, int, text);
 drop function if exists public.get_lost_pet(uuid);
 drop function if exists public.match_lost_pets(text, text, text, text);
 
@@ -464,12 +465,17 @@ $$;
 
 create or replace function public.search_lost_pets(p_query text default null, p_species text default null,
                                                    p_limit int default 50, p_offset int default 0,
-                                                   p_country text default null)
+                                                   p_country text default null, p_breed text default null,
+                                                   p_color text default null, p_place text default null)
 returns table (id uuid, name text, species text, breed text, color text, sex text, age_years int, marks text,
                last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[], country_code text)
 language sql stable security definer set search_path = '' as $$
   select g.* from public.get_lost_pets(100, 0, p_country) g
    where (p_species is null or p_species in ('', 'all') or g.species = p_species)
+     and (nullif(trim(p_breed), '') is null or position(lower(trim(p_breed)) in lower(coalesce(g.breed, ''))) > 0)
+     and (nullif(trim(p_color), '') is null or position(lower(trim(p_color)) in lower(coalesce(g.color, ''))) > 0)
+     and (nullif(trim(p_place), '') is null
+          or position(lower(trim(p_place)) in lower(concat_ws(' ', g.last_place, g.last_city))) > 0)
      and (nullif(trim(p_query), '') is null
           or position(lower(trim(p_query)) in lower(concat_ws(' ', g.name, g.breed, g.color, g.marks, g.last_place, g.last_city))) > 0)
    limit least(greatest(p_limit, 1), 100) offset greatest(p_offset, 0);
@@ -516,7 +522,7 @@ $$;
 -- Behörigheter för funktionerna: först ta bort allt, sedan ge bara det som behövs
 revoke all on all functions in schema public from public, anon, authenticated;
 grant execute on function public.get_lost_pets(int, int, text) to anon, authenticated;
-grant execute on function public.search_lost_pets(text, text, int, int, text) to anon, authenticated;
+grant execute on function public.search_lost_pets(text, text, int, int, text, text, text, text) to anon, authenticated;
 grant execute on function public.get_lost_pet(uuid) to anon, authenticated;
 grant execute on function public.match_lost_pets(text, text, text, text, text) to anon, authenticated;
 grant execute on function public.change_username(text) to authenticated;

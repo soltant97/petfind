@@ -65,11 +65,19 @@
       await sb.auth.signOut();
     },
     /* ----- offentlig sökning (säkra funktioner) ----- */
-    async searchLost(q, species, country) {
-      const a = { p_query: q || null, p_species: species === 'all' ? null : species };
-      let r = await sb.rpc('search_lost_pets', { ...a, p_country: country || null });
-      if (r.error) r = await sb.rpc('search_lost_pets', a); // gammal databas utan land
-      const rows = ok(r);
+    async searchLost(f, species, country) {
+      f = f || {};
+      const base = { p_species: species === 'all' ? null : species };
+      const ext = { p_breed: f.breed || null, p_color: f.color || null, p_place: f.place || null };
+      let r = await sb.rpc('search_lost_pets', { ...base, ...ext, p_country: country || null });
+      let client = false;
+      if (r.error) { r = await sb.rpc('search_lost_pets', { ...base, p_country: country || null }); client = true; }
+      if (r.error) r = await sb.rpc('search_lost_pets', base); // gammal databas utan land
+      let rows = ok(r);
+      if (client) { // databasen saknar de nya filtren: filtrera här i stället
+        const has = (v, q) => !q || String(v || '').toLowerCase().includes(q.trim().toLowerCase());
+        rows = rows.filter((x) => has(x.breed, f.breed) && has(x.color, f.color) && has(x.last_place + ' ' + x.last_city, f.place));
+      }
       return attach(rows.map(fromLost));
     },
     async getLost(id) {
