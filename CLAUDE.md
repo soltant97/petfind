@@ -64,6 +64,8 @@ Beslut om drift (Supabase Free):
 - Kod ska ligga i ett privat GitHub-repo (gratis).
 - Webbplatsen driftsätts på gratis värdtjänst, vald senare.
 
+- Sparad designskiss (inte införd): `design/skiss-ljus-korall.html`, ljus korall (#FFC4B8, ytor #FFEDE8) i stället för gult, bakgrunden oförändrad. Användaren funderar; byt inte färger i appen utan besked.
+
 ## Nästa steg
 1. Användaren kör om hela `supabase/schema.sql` i Supabase SQL Editor (nya landsregler) och svarar "klart". Sätt Authentication → URL Configuration → Site URL = https://soltant97.github.io/petfind/ (+ redirect-URL) för lösenordsåterställning.
 2. Testa live med tre konton enligt testkraven (ägare, upphittare, tredje användare; avslag, blockering, återfunnet) samt gästsökning, karta, adressförslag, rasväljare, land (Sverige/Spanien, fel land blockeras). Rätta fel användaren rapporterar.
