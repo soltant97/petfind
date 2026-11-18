@@ -49,7 +49,7 @@ create table if not exists public.pets (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references public.profiles(id) on delete cascade,
   name text not null check (char_length(name) between 1 and 60),
-  species text not null check (species in ('cat','dog','other')),
+  species text not null check (species in ('cat','dog','bird','rodent','reptile','amphibian','other')),
   breed text check (char_length(breed) <= 80),
   color text not null check (char_length(color) between 1 and 80),
   sex text not null default 'unknown' check (sex in ('f','m','unknown')),
@@ -125,7 +125,7 @@ create trigger pets_status_guard_trg before update of status on public.pets
 create table if not exists public.found_reports (
   id uuid primary key default gen_random_uuid(),
   finder_id uuid not null references public.profiles(id) on delete cascade,
-  species text not null check (species in ('cat','dog','other')),
+  species text not null check (species in ('cat','dog','bird','rodent','reptile','amphibian','other')),
   place text not null check (char_length(place) between 1 and 120),
   description text check (char_length(description) <= 2000),
   photo_paths text[] not null default '{}',
@@ -202,6 +202,14 @@ create policy profiles_read on public.profiles for select using (true);
 
 -- pets: bara ägaren når tabellen (chipnummer får aldrig läcka). Publikt går via funktioner.
 grant select, delete on public.pets to authenticated;
+-- Fler djurslag (fåglar, kaniner/gnagare, reptiler, groddjur): uppdatera befintliga tabeller
+alter table public.pets drop constraint if exists pets_species_check;
+alter table public.pets add constraint pets_species_check
+  check (species in ('cat','dog','bird','rodent','reptile','amphibian','other'));
+alter table public.found_reports drop constraint if exists found_reports_species_check;
+alter table public.found_reports add constraint found_reports_species_check
+  check (species in ('cat','dog','bird','rodent','reptile','amphibian','other'));
+
 grant insert (owner_id, name, species, breed, color, sex, age_years, marks, description, chip_number) on public.pets to authenticated;
 grant update (name, species, breed, color, sex, age_years, marks, description, chip_number, status) on public.pets to authenticated;
 drop policy if exists pets_owner_select on public.pets;
