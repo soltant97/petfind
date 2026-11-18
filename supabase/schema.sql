@@ -577,12 +577,13 @@ drop function if exists public.get_lost_pets(int, int, text);
 create or replace function public.get_lost_pets(p_limit int default 50, p_offset int default 0, p_country text default null)
 returns table (id uuid, name text, species text, breed text, color text, sex text, age_years int, marks text,
                last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[], country_code text,
-               eye_color text, size text, collar text)
+               eye_color text, size text, collar text, age_months int)
 language sql stable security definer set search_path = '' as $$
   select p.id, p.name, p.species, p.breed, p.color, p.sex, coalesce(date_part('year', age(p.birth_date))::int, p.age_years), p.marks,
          r.last_place, r.last_city, r.lost_on, r.circumstances, pr.username,
          coalesce((select array_agg(ph.path order by ph.sort, ph.created_at) from public.pet_photos ph where ph.pet_id = p.id), '{}'),
-         r.country_code, p.eye_color, p.size, p.collar
+         r.country_code, p.eye_color, p.size, p.collar,
+         case when p.birth_date is null then null else (date_part('year', age(p.birth_date))::int * 12 + date_part('month', age(p.birth_date))::int + case when date_part('day', age(p.birth_date)) > 15 then 1 else 0 end) end
     from public.pets p
     join public.lost_reports r on r.pet_id = p.id and r.status = 'active'
     join public.profiles pr on pr.id = p.owner_id and not pr.paused
@@ -599,7 +600,7 @@ create or replace function public.search_lost_pets(p_query text default null, p_
                                                    p_color text default null, p_place text default null)
 returns table (id uuid, name text, species text, breed text, color text, sex text, age_years int, marks text,
                last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[], country_code text,
-               eye_color text, size text, collar text)
+               eye_color text, size text, collar text, age_months int)
 language sql stable security definer set search_path = '' as $$
   select g.* from public.get_lost_pets(100, 0, p_country) g
    where (p_species is null or p_species in ('', 'all') or g.species = p_species)
@@ -616,7 +617,7 @@ drop function if exists public.get_lost_pet(uuid);
 create or replace function public.get_lost_pet(p_id uuid)
 returns table (id uuid, name text, species text, breed text, color text, sex text, age_years int, marks text,
                last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[], country_code text,
-               eye_color text, size text, collar text)
+               eye_color text, size text, collar text, age_months int)
 language sql stable security definer set search_path = '' as $$
   select g.* from public.get_lost_pets(100, 0) g where g.id = p_id;
 $$;

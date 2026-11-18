@@ -113,3 +113,8 @@ Beslut om drift (Supabase Free):
 
 ## Färger (v=80)
 - Färglistan (COLORS i app.js) har ingen "Svartvit": svart och vit väljs som två färger (flerval, högst 4). Färgknapparna har en färgprick (COLSW); mönster (tigrerad, brindle, sköldpadd, trefärgad, fläckig, merle) har mönsterprick. Texten ovanför knapparna förklarar att man kan välja flera. Gamla poster med "Svartvit" visas fortfarande.
+
+## Djursidan och listor (v=86)
+- Djurprofilen har egna sektioner: Djur (var "Art"), Kön, Ålder; sedan Färg, Ras, Ögonfärg/Storlek/Halsband, Senast sedd, Sedd datum, Kännetecken, Beskrivning (= efterlysningens omständigheter). Ägare visas som en rad: avatar + användarnamn (ingen förklaringstext). "Kontakta ägaren/upphittaren" har meddelande-ikon.
+- Ålder visas från födelsedatum: under 12 månader i månader (avrundat upp när mer än 15 dagar av månaden gått, <1 månad = "Mindre än 1 månad"), annars hela år. get_lost_pets/search_lost_pets/get_lost_pet returnerar age_months (schema.sql MÅSTE köras om). Djurnamn visas alltid med stor första bokstav (capFirst).
+- Sparaknapp (bokmärke) finns även på korten i listor (inloggad, ej egna inlägg); tmp.sv håller sparade nycklar.

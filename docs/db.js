@@ -22,7 +22,7 @@
   }
   const fromLost = (r) => ({
     id: r.id, name: r.name, species: r.species, breed: r.breed || '', color: r.color || '', sex: r.sex, eye: r.eye_color || '', size: r.size || '', collar: r.collar || '',
-    age: r.age_years, marks: r.marks || '', place: r.last_place, city: r.last_city, date: r.lost_on,
+    age: r.age_years, ageM: r.age_months == null ? null : r.age_months, marks: r.marks || '', place: r.last_place, city: r.last_city, date: r.lost_on,
     circ: r.circumstances || '', owner: r.owner_username, photos: r.photo_paths || [], status: 'lost',
     score: r.score, common: r.common || []
   });
@@ -34,12 +34,22 @@
     if (n.getMonth() < b.getMonth() || (n.getMonth() === b.getMonth() && n.getDate() < b.getDate())) y--;
     return Math.max(0, Math.min(40, y));
   }
+  /* Ålder i månader: avrundas upp om mer än hälften av månaden gått (>15 dagar). */
+  function monthsOf(birth) {
+    if (!birth) return null;
+    const b = new Date(birth + 'T12:00:00'), n = new Date();
+    let m = (n.getFullYear() - b.getFullYear()) * 12 + n.getMonth() - b.getMonth();
+    let day = n.getDate() - b.getDate();
+    if (day < 0) { m--; day += new Date(n.getFullYear(), n.getMonth(), 0).getDate(); }
+    if (day > 15) m++;
+    return Math.max(0, m);
+  }
   function fromOwn(r) {
     const rep = (r.lost_reports || []).find((x) => x.status === 'active');
     const photos = (r.pet_photos || []).slice().sort((a, b) => a.sort - b.sort).map((x) => x.path);
     return {
       id: r.id, name: r.name, species: r.species, breed: r.breed || '', color: r.color || '', sex: r.sex, eye: r.eye_color || '', size: r.size || '', collar: r.collar || '',
-      age: ageOf(r.birth_date, r.age_years), birth: r.birth_date || '', marks: r.marks || '', desc: r.description || '', chip: r.chip_number || '', status: r.status,
+      age: ageOf(r.birth_date, r.age_years), ageM: monthsOf(r.birth_date), birth: r.birth_date || '', marks: r.marks || '', desc: r.description || '', chip: r.chip_number || '', status: r.status,
       place: rep ? rep.last_place : '', city: rep ? rep.last_city : '', date: rep ? rep.lost_on : '',
       circ: rep ? rep.circumstances : '', photos, owner: null, mineFlag: true
     };
