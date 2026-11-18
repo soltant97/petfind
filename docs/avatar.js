@@ -6,10 +6,10 @@
   const FUR = { cat: '#D9955A', dog: '#C69463', rabbit: '#F5EADB', fox: '#E5763F', bear: '#946447', panda: '#FFFCF5', mouse: '#C4BAB0', bird: '#FFD23F', hamster: '#E8B77A', guineapig: '#C98B5A', parrot: '#E5483B', chicken: '#FFFCF5', squirrel: '#C9783C', zebra: '#FFFCF5', horse: '#A66A3F', lion: '#F0B259', monkey: '#8A5A3C', pig: '#F6B3B0', cow: '#FFFCF5', tiger: '#F08A2E' };
   const re = /^(cat|dog|rabbit|fox|bear|panda|mouse|bird|hamster|guineapig|parrot|chicken|squirrel|zebra|horse|lion|monkey|pig|cow|tiger):[0-7]:[0-9](:(?:[0-9]|1[0-5]))?$/;
   const ok = (c) => re.test(c || '');
-  const random = () => ANIMALS[Math.floor(Math.random() * ANIMALS.length)] + ':' + Math.floor(Math.random() * 8) + ':' + Math.floor(Math.random() * 9) + ':' + Math.floor(Math.random() * 5);
+  const random = () => ANIMALS[Math.floor(Math.random() * ANIMALS.length)] + ':' + Math.floor(Math.random() * 8) + ':' + Math.floor(Math.random() * 9) + ':' + Math.floor(Math.random() * 7);
   const code = (c) => c.a + ':' + c.b + ':' + c.x + (c.c ? ':' + c.c : '');
   /* Fjärde delen i koden = pose 0–4 (0 = standard). Äldre koder med större tal tolkas som standard. */
-  const parse = (c) => { const p = (ok(c) ? c : 'cat:0:0').split(':'); return { a: p[0], b: +p[1], x: +p[2], c: p[3] && +p[3] <= 4 ? +p[3] : 0 }; };
+  const parse = (c) => { const p = (ok(c) ? c : 'cat:0:0').split(':'); return { a: p[0], b: +p[1], x: +p[2], c: p[3] && +p[3] <= 6 ? +p[3] : 0 }; };
   const TOKEN = '#FE00FE';
   const FURS = [null,
     { c: '#FFFCF5', sv: 'Vit', en: 'White' }, { c: '#3B3431', sv: 'Svart', en: 'Black' }, { c: '#A8A29E', sv: 'Grå', en: 'Grey' },
@@ -25,28 +25,41 @@
   const tone = (c, dl) => { const [h, s, l] = toHsl(c); return fromHsl(h, s, Math.max(0.06, Math.min(0.94, l + dl))); };
   /* Andra färgen i tvåfärgade djur (panda, zebra, ko, tiger): samma nyans men tydligt mörkare eller ljusare */
   const contrast = (c) => { const [h, s, l] = toHsl(c); return lum(c) > 0.3 ? fromHsl(h, Math.min(s, 0.45), 0.2) : fromHsl(h, Math.min(s, 0.5), 0.9); };
-  /* Pose: 0 standard, 1 blinkning, 2 glad, 3 kärlek, 4 sömnig. Sätts i svg() innan djuret ritas. */
+  /* Pose: 0 glad, 1 blinkar, 2 tunga ute, 3 kärlek, 4 fryser, 5 gråter, 6 sömnig. Sätts i svg() innan djuret ritas. */
   let POSE = 0;
   const sclera = (x, y) => `<circle cx="${x}" cy="${y}" r="4.4" fill="#FFFCF5" stroke="#3A2A1E" stroke-opacity="0.35" stroke-width="0.8"/><circle cx="${x + (x < 50 ? 0.5 : -0.5)}" cy="${y + 0.5}" r="2.700" fill="#3A2A1E"/><circle cx="${x + (x < 50 ? 1.5 : 0.5)}" cy="${y - 0.6}" r="0.9" fill="#FFFCF5"/>`;
   const happy = (x, y, c) => `<path d="M${x - 4.5} ${y + 1.5}Q${x} ${y - 5} ${x + 4.5} ${y + 1.5}" fill="none" stroke="${c}" stroke-width="2.400" stroke-linecap="round"/>`;
   const sleepy = (x, y, c) => `<path d="M${x - 4.5} ${y}Q${x} ${y + 3} ${x + 4.5} ${y}" fill="none" stroke="${c}" stroke-width="2.400" stroke-linecap="round"/>`;
+  const squint = (x, y, c, left) => `<path d="M${left ? x - 4 : x + 4} ${y - 3.500}L${left ? x + 3 : x - 3} ${y}L${left ? x - 4 : x + 4} ${y + 3.500}" fill="none" stroke="${c}" stroke-width="2.400" stroke-linecap="round" stroke-linejoin="round"/>`;
   const heart = (x, y, k, c) => `<path transform="translate(${x} ${y}) scale(${k})" d="M0 4.500C-7 -1 -4.500 -7.500 0 -3.500C4.500 -7.500 7 -1 0 4.500Z" fill="${c || '#E5483B'}"/>`;
+  const tear = (x, y) => `<path d="M${x} ${y + 4}Q${x - 6} ${y + 13} ${x - 1} ${y + 22}Q${x + 6} ${y + 13} ${x} ${y + 4}Z" fill="#8FD3F4" stroke="#4FA6D6" stroke-width="0.8" stroke-linejoin="round"/><path d="M${x - 1} ${y + 8}v6" stroke="#FFFFFF" stroke-width="1.100" stroke-linecap="round" opacity="0.8"/>`;
   const eyePose = (xl, xr, y, col) => {
+    if (POSE === 0) return happy(xl, y, col) + happy(xr, y, col);
     if (POSE === 1) return sclera(xl, y) + happy(xr, y, col);
-    if (POSE === 2) return happy(xl, y, col) + happy(xr, y, col);
+    if (POSE === 2) return squint(xl, y, col, true) + squint(xr, y, col, false);
     if (POSE === 3) return heart(xl, y, 1.15) + heart(xr, y, 1.15);
-    if (POSE === 4) return sleepy(xl, y, col) + sleepy(xr, y, col);
-    return sclera(xl, y) + sclera(xr, y);
+    if (POSE === 4) return sclera(xl, y) + sclera(xr, y);
+    if (POSE === 5) return sleepy(xl, y, col) + sleepy(xr, y, col) + tear(xl - 1, y) + tear(xr + 1, y);
+    return sleepy(xl, y, col) + sleepy(xr, y, col);
+  };
+  /* Y-läge för munnen/hakan per djur (för tungan och isande tänder). */
+  const MY = { cat: 66, dog: 69, rabbit: 66, fox: 68, bear: 72, panda: 67, mouse: 65, bird: 72, hamster: 71, guineapig: 73, parrot: 81, chicken: 72, squirrel: 71, zebra: 79, horse: 82, lion: 69, monkey: 76, pig: 73, cow: 80, tiger: 72 };
+  const poseFace = (a) => {
+    const y = MY[a] || 70;
+    if (POSE === 2) return `<path d="M45 ${y}h10v6.500a5 5 0 0 1-10 0Z" fill="#F4708F" stroke="#C94A6B" stroke-width="1" stroke-linejoin="round"/><path d="M50 ${y + 1}v6" stroke="#C94A6B" stroke-width="1" stroke-linecap="round"/>`;
+    if (POSE === 4) return `<path d="M42 ${y}l3 4l3 -4l3 4l3 -4l3 4l3 -4" fill="none" stroke="#3A2A1E" stroke-width="1.800" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>`;
+    return '';
   };
   /* Extra detaljer runt djuret för varje pose (ritas ovanpå, inte lutade). */
   const poseExtra = () => {
+    if (POSE === 0) return `<ellipse cx="27" cy="64" rx="5" ry="3" fill="#F4806B" opacity="0.4"/><ellipse cx="73" cy="64" rx="5" ry="3" fill="#F4806B" opacity="0.4"/>`;
     if (POSE === 1) return `<path d="M82 14l2 6 6 2-6 2-2 6-2-6-6-2 6-2Z" fill="#FFD23F" stroke="#E0A81C" stroke-width="0.8" stroke-linejoin="round"/>`;
-    if (POSE === 2) return `<ellipse cx="27" cy="64" rx="5" ry="3" fill="#F4806B" opacity="0.4"/><ellipse cx="73" cy="64" rx="5" ry="3" fill="#F4806B" opacity="0.4"/>`;
     if (POSE === 3) return heart(82, 20, 1.1) + heart(91, 34, 0.7) + heart(14, 24, 0.8);
-    if (POSE === 4) return `<g fill="none" stroke="#7A6552" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M72 16h8l-8 9h8"/><path d="M84 6h5l-5 6h5"/></g>`;
+    if (POSE === 4) return `<rect width="100" height="100" fill="#A9DDF8" opacity="0.3"/><g fill="#E6F6FD" stroke="#7EC1E0" stroke-width="1.200" stroke-linejoin="round"><path d="M4 0L12 0L8 14Z"/><path d="M20 0L27 0L23.500 10Z"/><path d="M73 0L81 0L77 12Z"/><path d="M88 0L97 0L92.500 16Z"/></g><g stroke="#FFFFFF" stroke-width="1.600" stroke-linecap="round"><path d="M12 80v8M8 84h8M9.200 81.200l5.600 5.600M14.800 81.200l-5.600 5.600"/><path d="M88 66v6M85 69h6"/></g>`;
+    if (POSE === 6) return `<g fill="none" stroke="#7A6552" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M72 16h8l-8 9h8"/><path d="M84 6h5l-5 6h5"/></g>`;
     return '';
   };
-  const TILT = [0, 8, 0, 0, -8];
+  const TILT = [0, 8, -6, 0, 0, 0, -8];
   const faceRaw = (a, fur) => {
     const nat = !fur;
     const fc = nat ? FUR[a] : FURS[fur].c;
@@ -121,7 +134,7 @@
   /* Rund profilbild. size i px. */
   function svg(code, size, label) {
     const p = parse(code), s = size || 40;
-    return `<span class="av" style="width:${s}px;height:${s}px" role="img" aria-label="${label || 'Avatar'}"><svg viewBox="0 0 100 100" width="${s}" height="${s}" aria-hidden="true"><rect width="100" height="100" fill="${COLORS[p.b]}"/>${(POSE = p.c, '')}<g transform="rotate(${TILT[p.c]} 50 62)">${face(p.a, 0)}${acc(p.x)}</g>${poseExtra()}</svg></span>`;
+    return `<span class="av" style="width:${s}px;height:${s}px" role="img" aria-label="${label || 'Avatar'}"><svg viewBox="0 0 100 100" width="${s}" height="${s}" aria-hidden="true"><rect width="100" height="100" fill="${COLORS[p.b]}"/>${(POSE = p.c, '')}<g transform="rotate(${TILT[p.c]} 50 62)">${face(p.a, 0)}${poseFace(p.a)}${acc(p.x)}</g>${poseExtra()}</svg></span>`;
   }
-  window.AVATAR = { POSES: [0, 1, 2, 3, 4], ANIMALS, COLORS, FURS, FUR, BGS: [0, 1, 2, 3, 4, 5, 7], ACCS: [0, 1, 2, 3, 4, 5, 6, 7, 8], random, parse, code, ok, svg, accSvg, furFor };
+  window.AVATAR = { POSES: [0, 1, 2, 3, 4, 5, 6], ANIMALS, COLORS, FURS, FUR, BGS: [0, 1, 2, 3, 4, 5, 7], ACCS: [0, 1, 2, 3, 4, 5, 6, 7, 8], random, parse, code, ok, svg, accSvg, furFor };
 })();
