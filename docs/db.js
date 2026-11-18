@@ -21,7 +21,7 @@
     return list;
   }
   const fromLost = (r) => ({
-    id: r.id, name: r.name, species: r.species, breed: r.breed || '', color: r.color || '', sex: r.sex,
+    id: r.id, name: r.name, species: r.species, breed: r.breed || '', color: r.color || '', sex: r.sex, eye: r.eye_color || '', size: r.size || '', collar: r.collar || '',
     age: r.age_years, marks: r.marks || '', place: r.last_place, city: r.last_city, date: r.lost_on,
     circ: r.circumstances || '', owner: r.owner_username, photos: r.photo_paths || [], status: 'lost',
     score: r.score, common: r.common || []
@@ -38,7 +38,7 @@
     const rep = (r.lost_reports || []).find((x) => x.status === 'active');
     const photos = (r.pet_photos || []).slice().sort((a, b) => a.sort - b.sort).map((x) => x.path);
     return {
-      id: r.id, name: r.name, species: r.species, breed: r.breed || '', color: r.color || '', sex: r.sex,
+      id: r.id, name: r.name, species: r.species, breed: r.breed || '', color: r.color || '', sex: r.sex, eye: r.eye_color || '', size: r.size || '', collar: r.collar || '',
       age: ageOf(r.birth_date, r.age_years), birth: r.birth_date || '', marks: r.marks || '', desc: r.description || '', chip: r.chip_number || '', status: r.status,
       place: rep ? rep.last_place : '', city: rep ? rep.last_city : '', date: rep ? rep.lost_on : '',
       circ: rep ? rep.circumstances : '', photos, owner: null, mineFlag: true
@@ -46,7 +46,7 @@
   }
 
   const fromFound = (r) => ({
-    id: r.id, kind: 'found', name: r.species, species: r.species, breed: '', color: r.color || '', place: r.place, city: r.city,
+    id: r.id, kind: 'found', name: r.species, species: r.species, breed: r.breed || '', color: r.color || '', sex: r.sex || '', eye: r.eye_color || '', size: r.size || '', collar: r.collar || '', place: r.place, city: r.city,
     date: r.found_on, desc: r.description || '', finder: r.finder_username, photos: r.photo_paths || [], status: 'found-post'
   });
 
@@ -112,7 +112,7 @@
       return rows.length ? (await attach([fromLost(rows[0])]))[0] : null;
     },
     async match(f, scope, country) {
-      const a = { p_species: f.species, p_place: f.place, p_scope: scope, p_description: f.desc || '' };
+      const a = { p_species: f.species, p_place: f.place, p_scope: scope, p_description: f.desc || '', p_breed: f.breed || null, p_color: f.color || null, p_eye: f.eye || null, p_size: f.size || null, p_collar: f.collar || null, p_sex: f.sex || null };
       let r = await sb.rpc('match_lost_pets', { ...a, p_country: country || null });
       if (r.error) r = await sb.rpc('match_lost_pets', a);
       const rows = ok(r);
@@ -135,7 +135,7 @@
     },
     async addPet(uid, f, blobs) {
       const pet = ok(await sb.from('pets').insert({ owner_id: uid, name: f.name, species: f.species, breed: f.breed || null, color: f.color,
-        sex: f.sex || 'unknown', age_years: ageOf(f.birth, null), birth_date: f.birth || null, marks: f.marks || null, description: f.desc || null, chip_number: f.chip || null }).select('id').single());
+        sex: f.sex || 'unknown', age_years: ageOf(f.birth, null), birth_date: f.birth || null, eye_color: f.eye || null, size: f.size || null, collar: f.collar || null, marks: f.marks || null, description: f.desc || null, chip_number: f.chip || null }).select('id').single());
       try {
         const angles = ['front', 'left', 'right'];
         for (let i = 0; i < blobs.length; i++) {
@@ -147,7 +147,7 @@
     },
     async updatePet(id, f) {
       ok(await sb.from('pets').update({ name: f.name, species: f.species, breed: f.breed || null, color: f.color, sex: f.sex || 'unknown',
-        age_years: ageOf(f.birth, null), birth_date: f.birth || null, marks: f.marks || null, description: f.desc || null, chip_number: f.chip || null }).eq('id', id));
+        age_years: ageOf(f.birth, null), birth_date: f.birth || null, eye_color: f.eye || null, size: f.size || null, collar: f.collar || null, marks: f.marks || null, description: f.desc || null, chip_number: f.chip || null }).eq('id', id));
     },
     async deletePet(id) {
       const ph = ok(await sb.from('pet_photos').select('path').eq('pet_id', id));
@@ -176,7 +176,7 @@
       const paths = [];
       for (const b of blobs) paths.push(await DB.uploadBlob(uid, 'found', b));
       try {
-        return ok(await sb.rpc('publish_found', { p_species: f.species, p_color: f.color || null, p_place: f.place, p_city: f.city, p_country: country, p_device_country: deviceCountry, p_desc: f.desc || null, p_paths: paths }));
+        return ok(await sb.rpc('publish_found', { p_species: f.species, p_color: f.color || null, p_place: f.place, p_city: f.city, p_country: country, p_device_country: deviceCountry, p_desc: f.desc || null, p_paths: paths, p_breed: f.breed || null, p_eye: f.eye || null, p_size: f.size || null, p_collar: f.collar || null, p_sex: f.sex || null }));
       } catch (e) { await sb.storage.from(BUCKET).remove(paths); throw e; }
     },
     async closeFound(id) { ok(await sb.rpc('close_found', { p_id: id })); },

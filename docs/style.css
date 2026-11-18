@@ -177,3 +177,4 @@ body.inchat .chatbg>:first-child{margin-top:auto}
 .modal.wide{width:min(92vw,400px);max-height:86vh;overflow:auto}.modal .avgrid{margin:6px 0 10px}.modal .avgrid button{flex-direction:column;align-items:center;gap:2px}.anl{font-size:12px;font-weight:700;color:var(--t)}
 .posegrid{grid-template-columns:repeat(4,1fr);gap:6px}.posegrid button{height:auto;width:auto;border-radius:16px;flex-direction:column;padding:8px 2px 6px;gap:4px}.posegrid .anl{font-size:11px;font-weight:700;color:var(--t)}
 .birthrow{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:8px}.birthrow select{width:100%}
+.fmodal{max-height:88vh;overflow:auto;text-align:left}.fmodal .fhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.fmodal .fhead h2{margin:0}.fmodal .fx{border:0;background:var(--b);width:36px;height:36px;border-radius:50%;font-size:22px;line-height:1;cursor:pointer;color:var(--t)}.fmodal .fbody{padding:0}.fmodal .btn:disabled{opacity:.5}

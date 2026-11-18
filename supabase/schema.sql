@@ -299,11 +299,35 @@ alter table public.found_reports drop constraint if exists found_reports_species
 alter table public.found_reports add constraint found_reports_species_check
   check (species in ('cat','dog','bird','rabbit','rodent','reptile','other'));
 
+alter table public.pets add column if not exists eye_color text;
+alter table public.pets add column if not exists size text;
+alter table public.pets add column if not exists collar text;
+alter table public.pets drop constraint if exists pets_eye_ok;
+alter table public.pets add constraint pets_eye_ok check (eye_color is null or eye_color in ('Brun','Blå','Grön','Gul','Bärnsten','Grå','Hasselnöt','Olika färger','Okänd'));
+alter table public.pets drop constraint if exists pets_size_ok;
+alter table public.pets add constraint pets_size_ok check (size is null or size in ('Liten','Medelstor','Stor'));
+alter table public.pets drop constraint if exists pets_collar_ok;
+alter table public.pets add constraint pets_collar_ok check (collar is null or collar in ('Inget halsband','Svart','Brun','Röd','Orange','Gul','Grön','Blå','Rosa','Lila','Vit','Flerfärgat','Okänd'));
+alter table public.found_reports add column if not exists breed text;
+alter table public.found_reports add column if not exists eye_color text;
+alter table public.found_reports add column if not exists size text;
+alter table public.found_reports add column if not exists collar text;
+alter table public.found_reports add column if not exists sex text;
+alter table public.found_reports drop constraint if exists found_breed_ok;
+alter table public.found_reports add constraint found_breed_ok check (breed is null or char_length(breed) <= 80);
+alter table public.found_reports drop constraint if exists found_eye_ok;
+alter table public.found_reports add constraint found_eye_ok check (eye_color is null or eye_color in ('Brun','Blå','Grön','Gul','Bärnsten','Grå','Hasselnöt','Olika färger','Okänd'));
+alter table public.found_reports drop constraint if exists found_size_ok;
+alter table public.found_reports add constraint found_size_ok check (size is null or size in ('Liten','Medelstor','Stor'));
+alter table public.found_reports drop constraint if exists found_collar_ok;
+alter table public.found_reports add constraint found_collar_ok check (collar is null or collar in ('Inget halsband','Svart','Brun','Röd','Orange','Gul','Grön','Blå','Rosa','Lila','Vit','Flerfärgat','Okänd'));
+alter table public.found_reports drop constraint if exists found_sex_ok;
+alter table public.found_reports add constraint found_sex_ok check (sex is null or sex in ('f','m','unknown'));
 alter table public.pets add column if not exists birth_date date;
 alter table public.pets drop constraint if exists pets_birth_date_ok;
 alter table public.pets add constraint pets_birth_date_ok check (birth_date is null or (birth_date <= current_date and birth_date >= date '1980-01-01'));
-grant insert (owner_id, name, species, breed, color, sex, age_years, birth_date, marks, description, chip_number) on public.pets to authenticated;
-grant update (name, species, breed, color, sex, age_years, birth_date, marks, description, chip_number, status) on public.pets to authenticated;
+grant insert (owner_id, name, species, breed, color, sex, age_years, birth_date, eye_color, size, collar, marks, description, chip_number) on public.pets to authenticated;
+grant update (name, species, breed, color, sex, age_years, birth_date, eye_color, size, collar, marks, description, chip_number, status) on public.pets to authenticated;
 drop policy if exists pets_owner_select on public.pets;
 drop policy if exists pets_owner_insert on public.pets;
 drop policy if exists pets_owner_update on public.pets;
@@ -549,14 +573,16 @@ end $$;
 -- ---------- Offentliga sökfunktioner: returnerar BARA tillåtna fält ----------
 -- Ingen ägar-id, inget chipnummer, inga personuppgifter. Bara aktivt borttappade djur
 -- vars ägare inte pausat kontot.
+drop function if exists public.get_lost_pets(int, int, text);
 create or replace function public.get_lost_pets(p_limit int default 50, p_offset int default 0, p_country text default null)
 returns table (id uuid, name text, species text, breed text, color text, sex text, age_years int, marks text,
-               last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[], country_code text)
+               last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[], country_code text,
+               eye_color text, size text, collar text)
 language sql stable security definer set search_path = '' as $$
   select p.id, p.name, p.species, p.breed, p.color, p.sex, coalesce(date_part('year', age(p.birth_date))::int, p.age_years), p.marks,
          r.last_place, r.last_city, r.lost_on, r.circumstances, pr.username,
          coalesce((select array_agg(ph.path order by ph.sort, ph.created_at) from public.pet_photos ph where ph.pet_id = p.id), '{}'),
-         r.country_code
+         r.country_code, p.eye_color, p.size, p.collar
     from public.pets p
     join public.lost_reports r on r.pet_id = p.id and r.status = 'active'
     join public.profiles pr on pr.id = p.owner_id and not pr.paused
@@ -566,12 +592,14 @@ language sql stable security definer set search_path = '' as $$
    limit least(greatest(p_limit, 1), 100) offset greatest(p_offset, 0);
 $$;
 
+drop function if exists public.search_lost_pets(text, text, int, int, text, text, text, text);
 create or replace function public.search_lost_pets(p_query text default null, p_species text default null,
                                                    p_limit int default 50, p_offset int default 0,
                                                    p_country text default null, p_breed text default null,
                                                    p_color text default null, p_place text default null)
 returns table (id uuid, name text, species text, breed text, color text, sex text, age_years int, marks text,
-               last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[], country_code text)
+               last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[], country_code text,
+               eye_color text, size text, collar text)
 language sql stable security definer set search_path = '' as $$
   select g.* from public.get_lost_pets(100, 0, p_country) g
    where (p_species is null or p_species in ('', 'all') or g.species = p_species)
@@ -584,16 +612,21 @@ language sql stable security definer set search_path = '' as $$
    limit least(greatest(p_limit, 1), 100) offset greatest(p_offset, 0);
 $$;
 
+drop function if exists public.get_lost_pet(uuid);
 create or replace function public.get_lost_pet(p_id uuid)
 returns table (id uuid, name text, species text, breed text, color text, sex text, age_years int, marks text,
-               last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[], country_code text)
+               last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[], country_code text,
+               eye_color text, size text, collar text)
 language sql stable security definer set search_path = '' as $$
   select g.* from public.get_lost_pets(100, 0) g where g.id = p_id;
 $$;
 
 -- Upphittat-flödet: förfilter (borttappad + samma djurslag + område) och ordöverlappning.
 -- p_scope: 'area' | 'city' | 'country'. Detta är INTE AI-bildmatchning.
-create or replace function public.match_lost_pets(p_species text, p_place text, p_scope text default 'area', p_description text default '', p_country text default null)
+drop function if exists public.match_lost_pets(text, text, text, text, text);
+create or replace function public.match_lost_pets(p_species text, p_place text, p_scope text default 'area', p_description text default '', p_country text default null,
+                                                  p_breed text default null, p_color text default null, p_eye text default null,
+                                                  p_size text default null, p_collar text default null, p_sex text default null)
 returns table (id uuid, name text, species text, color text, marks text, last_place text, last_city text,
                lost_on date, owner_username text, photo_paths text[], score int, common text[])
 language sql stable security definer set search_path = '' as $$
@@ -601,8 +634,21 @@ language sql stable security definer set search_path = '' as $$
     select coalesce(array_agg(distinct w), '{}') as ws
       from unnest(regexp_split_to_array(lower(coalesce(p_description, '')), '[^a-zåäöé0-9]+')) w
      where char_length(w) > 2
+  ), qc as (
+    select coalesce(array_agg(distinct w), '{}') as ws
+      from unnest(regexp_split_to_array(lower(coalesce(p_color, '')), '[^a-zåäöé0-9]+')) w
+     where char_length(w) > 2
   ), c as (
     select g.*,
+           array_remove(array[
+             (select string_agg(distinct w, ', ') from unnest(regexp_split_to_array(lower(coalesce(g.color, '')), '[^a-zåäöé0-9]+')) w
+               where char_length(w) > 2 and array_position((select ws from qc), w) is not null),
+             case when nullif(trim(p_breed), '') is not null and lower(coalesce(g.breed, '')) = lower(trim(p_breed)) then g.breed end,
+             case when nullif(p_eye, '') is not null and g.eye_color = p_eye then g.eye_color end,
+             case when nullif(p_size, '') is not null and g.size = p_size then g.size end,
+             case when nullif(p_collar, '') is not null and p_collar <> 'Okänd' and g.collar = p_collar then g.collar end,
+             case when p_sex in ('f', 'm') and g.sex = p_sex then g.sex end
+           ], null) as attr_common,
            array(select distinct w from unnest(regexp_split_to_array(lower(concat_ws(' ', g.color, g.breed, g.marks)), '[^a-zåäöé0-9]+')) w
                   where array_position((select ws from q), w) is not null) as common_words
       from public.get_lost_pets(100, 0, p_country) g
@@ -618,15 +664,18 @@ language sql stable security definer set search_path = '' as $$
             end)
   )
   select c.id, c.name, c.species, c.color, c.marks, c.last_place, c.last_city, c.lost_on, c.owner_username, c.photo_paths,
-         cardinality(c.common_words), c.common_words
-    from c order by cardinality(c.common_words) desc, c.lost_on desc limit 50;
+         cardinality(c.attr_common || c.common_words), c.attr_common || c.common_words
+    from c order by cardinality(c.attr_common || c.common_words) desc, c.lost_on desc limit 50;
 $$;
 
 
 -- ---------- Upphittade djur: publicera, stäng, offentlig sökning, kontakt ----------
 -- Platsen som skickas hit är bara område/ort (aldrig gatuadress). Landet måste stämma med enhetens land.
+drop function if exists public.publish_found(text, text, text, text, text, text, text, text[]);
 create or replace function public.publish_found(p_species text, p_color text, p_place text, p_city text, p_country text,
-                                                p_device_country text, p_desc text, p_paths text[])
+                                                p_device_country text, p_desc text, p_paths text[],
+                                                p_breed text default null, p_eye text default null, p_size text default null,
+                                                p_collar text default null, p_sex text default null)
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare v_id uuid; v_path text;
 begin
@@ -644,9 +693,11 @@ begin
     if v_path not like auth.uid()::text || '/found/%' then raise exception 'Ogiltig bildsökväg'; end if;
   end loop;
   if char_length(coalesce(p_desc, '')) > 2000 or char_length(coalesce(p_color, '')) > 80 then raise exception 'För lång text'; end if;
-  insert into public.found_reports (finder_id, species, color, place, city, country_code, description, photo_paths, is_public)
+  insert into public.found_reports (finder_id, species, color, place, city, country_code, description, photo_paths, is_public,
+                                    breed, eye_color, size, collar, sex)
     values (auth.uid(), p_species, nullif(trim(p_color), ''), trim(p_place), trim(p_city), upper(p_country),
-            nullif(trim(p_desc), ''), p_paths, true)
+            nullif(trim(p_desc), ''), p_paths, true,
+            nullif(trim(p_breed), ''), nullif(p_eye, ''), nullif(p_size, ''), nullif(p_collar, ''), nullif(p_sex, ''))
     returning id into v_id;
   -- möjlig träff: aktiva borttappade djur av samma djurslag i samma land (en notis per ägare)
   insert into public.notifications (user_id, type, found_id, pet_name)
@@ -689,11 +740,14 @@ begin
 end $$;
 
 
+drop function if exists public.get_found_pets(int, int, text);
 create or replace function public.get_found_pets(p_limit int default 50, p_offset int default 0, p_country text default null)
 returns table (id uuid, species text, color text, place text, city text, found_on date, description text,
-               finder_username text, photo_paths text[], country_code text)
+               finder_username text, photo_paths text[], country_code text,
+               breed text, eye_color text, size text, collar text, sex text)
 language sql stable security definer set search_path = '' as $$
-  select f.id, f.species, f.color, f.place, f.city, f.created_at::date, f.description, pr.username, f.photo_paths, f.country_code
+  select f.id, f.species, f.color, f.place, f.city, f.created_at::date, f.description, pr.username, f.photo_paths, f.country_code,
+         f.breed, f.eye_color, f.size, f.collar, f.sex
     from public.found_reports f
     join public.profiles pr on pr.id = f.finder_id and not pr.paused
    where f.is_public and f.closed_at is null
@@ -702,11 +756,13 @@ language sql stable security definer set search_path = '' as $$
    limit least(greatest(p_limit, 1), 100) offset greatest(p_offset, 0);
 $$;
 
+drop function if exists public.search_found_pets(text, text, int, int, text, text, text);
 create or replace function public.search_found_pets(p_query text default null, p_species text default null,
                                                     p_limit int default 50, p_offset int default 0,
                                                     p_country text default null, p_color text default null, p_place text default null)
 returns table (id uuid, species text, color text, place text, city text, found_on date, description text,
-               finder_username text, photo_paths text[], country_code text)
+               finder_username text, photo_paths text[], country_code text,
+               breed text, eye_color text, size text, collar text, sex text)
 language sql stable security definer set search_path = '' as $$
   select g.* from public.get_found_pets(100, 0, p_country) g
    where (p_species is null or p_species in ('', 'all') or g.species = p_species)
@@ -717,9 +773,11 @@ language sql stable security definer set search_path = '' as $$
    limit least(greatest(p_limit, 1), 100) offset greatest(p_offset, 0);
 $$;
 
+drop function if exists public.get_found_pet(uuid);
 create or replace function public.get_found_pet(p_id uuid)
 returns table (id uuid, species text, color text, place text, city text, found_on date, description text,
-               finder_username text, photo_paths text[], country_code text)
+               finder_username text, photo_paths text[], country_code text,
+               breed text, eye_color text, size text, collar text, sex text)
 language sql stable security definer set search_path = '' as $$
   select g.* from public.get_found_pets(100, 0) g where g.id = p_id;
 $$;
@@ -758,11 +816,11 @@ grant execute on function public.get_lost_pet(uuid) to anon, authenticated;
 grant execute on function public.get_found_pets(int, int, text) to anon, authenticated;
 grant execute on function public.search_found_pets(text, text, int, int, text, text, text) to anon, authenticated;
 grant execute on function public.get_found_pet(uuid) to anon, authenticated;
-grant execute on function public.publish_found(text, text, text, text, text, text, text, text[]) to authenticated;
+grant execute on function public.publish_found(text, text, text, text, text, text, text, text[], text, text, text, text, text) to authenticated;
 grant execute on function public.close_found(uuid) to authenticated;
 grant execute on function public.create_found_contact_request(uuid, text) to authenticated;
 
-grant execute on function public.match_lost_pets(text, text, text, text, text) to anon, authenticated;
+grant execute on function public.match_lost_pets(text, text, text, text, text, text, text, text, text, text, text) to anon, authenticated;
 grant execute on function public.change_username(text) to authenticated;
 grant execute on function public.set_paused(boolean) to authenticated;
 grant execute on function public.report_lost(uuid, text, text, date, text, text, text) to authenticated;
