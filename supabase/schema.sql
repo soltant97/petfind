@@ -217,6 +217,18 @@ alter table public.chat_mutes enable row level security;
 drop policy if exists chat_mutes_own_select on public.chat_mutes;
 create policy chat_mutes_own_select on public.chat_mutes for select to authenticated using (user_id = (select auth.uid()));
 
+-- Sparade inlägg (bokmärken): borttappade djur (ref_id = djurets id) eller upphittade (ref_id = fyndets id)
+create table if not exists public.saved_posts (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  kind text not null check (kind in ('lost','found')),
+  ref_id uuid not null,
+  created_at timestamptz not null default now(),
+  primary key (user_id, kind, ref_id)
+);
+alter table public.saved_posts enable row level security;
+drop policy if exists saved_posts_own_select on public.saved_posts;
+create policy saved_posts_own_select on public.saved_posts for select to authenticated using (user_id = (select auth.uid()));
+
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
   request_id uuid not null references public.contact_requests(id) on delete cascade,
@@ -334,6 +346,7 @@ create policy found_own_delete on public.found_reports for delete to authenticat
 -- blocks: man ser bara sina egna. Skapas via block_user().
 grant select on public.blocks to authenticated;
 grant select on public.chat_mutes to authenticated;
+grant select on public.saved_posts to authenticated;
 drop policy if exists blocks_own_select on public.blocks;
 create policy blocks_own_select on public.blocks for select to authenticated using (blocker_id = (select auth.uid()));
 
@@ -782,6 +795,27 @@ language sql stable security definer set search_path = '' as $$
   where lower(pr.username) = lower(p_username) and not pr.paused;
 $$;
 
+-- Spara / ta bort sparat inlägg (max 200 per användare; bara aktuella offentliga inlägg kan sparas)
+create or replace function public.save_post(p_kind text, p_ref uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Inte inloggad'; end if;
+  if p_kind not in ('lost','found') then raise exception 'Ogiltig typ'; end if;
+  if p_kind = 'lost' and not exists (select 1 from public.pets p join public.lost_reports lr on lr.pet_id = p.id and lr.status = 'active'
+       where p.id = p_ref and p.status = 'lost') then raise exception 'Inlägget finns inte'; end if;
+  if p_kind = 'found' and not exists (select 1 from public.found_reports f where f.id = p_ref and f.is_public and f.closed_at is null) then
+    raise exception 'Inlägget finns inte'; end if;
+  if (select count(*) from public.saved_posts where user_id = auth.uid()) >= 200 then raise exception 'Du kan spara max 200 inlägg'; end if;
+  insert into public.saved_posts (user_id, kind, ref_id) values (auth.uid(), p_kind, p_ref) on conflict do nothing;
+end $$;
+
+create or replace function public.unsave_post(p_kind text, p_ref uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Inte inloggad'; end if;
+  delete from public.saved_posts where user_id = auth.uid() and kind = p_kind and ref_id = p_ref;
+end $$;
+
 -- Offentlig lista över en användares djur: bara djurslag och namn (aldrig chipnummer eller annat)
 create or replace function public.get_user_pets(p_user uuid)
 returns table (species text, name text, status text)
@@ -851,6 +885,8 @@ grant execute on function public.unblock_user(uuid) to authenticated;
 grant execute on function public.attach_request_photos(uuid, text[]) to authenticated;
 grant execute on function public.get_user_card(text) to authenticated;
 grant execute on function public.get_user_pets(uuid) to authenticated;
+grant execute on function public.save_post(text, uuid) to authenticated;
+grant execute on function public.unsave_post(text, uuid) to authenticated;
 grant execute on function public.set_chat_muted(uuid, boolean) to authenticated;
 grant execute on function public.block_user_by_id(uuid) to authenticated;
 grant execute on function public.report_user(uuid, text, text) to authenticated;
