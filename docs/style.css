@@ -90,3 +90,8 @@ select:disabled{opacity:.6}
 .filterbtn{display:inline-flex;align-items:center;gap:8px}
 .fpanel{margin-top:12px;padding:14px;border-radius:18px;background:var(--lb,#FFF3C9)}
 .fpanel[hidden]{display:none}
+
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:34px 20px;border-radius:24px;background:var(--w,#FFFCF5);border:1.5px solid var(--db,#E9DCC8)}
+.empty svg{margin-bottom:10px}
+.empty b{font-size:18px;font-weight:800;color:#3A2A1E}
+.empty span{font-size:15px;font-weight:600;color:#7A6552}
