@@ -40,7 +40,7 @@ Fullständig kravlista och beslut finns i Claude-projektet "Pet Finder APP" (dok
 3. AI-bildmatchning.
 Testmiljö: separat Supabase dev-projekt (djurhittaren-dev), se Status nedan. Testa med tre separata konton enligt testkraven i projektet.
 
-## Status (uppdaterad 2026-11-17)
+## Status (uppdaterad 2026-11-18)
 Klart:
 - Mapp och denna CLAUDE.md skapade. Kravdokumentet "krav-och-beslut" ligger i Claude-projektet.
 - Supabase Free-projekt `djurhittaren-dev` skapat i molnet av användaren (beslut: molnet, inte lokalt/Docker). URL och publishable-nyckel ligger i `.env` (ignoreras av git, `.env.example` är mallen). Den hemliga nyckeln (secret/service_role) har aldrig delats och ska aldrig delas.
@@ -50,12 +50,16 @@ Byggt och uppladdat (GitHub Pages: https://soltant97.github.io/petfind/, repo so
 - Webbapp kopplad till Supabase (docs/app.js, db.js, config.js med publishable-nyckel): registrering/inloggning/återställ lösenord, djurregistrering med ≥2 foton (bilder skalas ned till 1024 px), borttappat/återfunnet, offentlig sökning, upphittat-flöde med textmatchning, kontaktförfrågan, godkänn/avböj/återkalla, privat chatt med realtid, notiser (oläst-siffra), blockering, byte av användarnamn, pausa/radera konto, sv/en.
 - Databasen (schema.sql) är körd i djurhittaren-dev av användaren och går att köra om. Nya landsregler (hemland, p_country-filter, report_lost med p_country + p_device_country, set_home_country) ligger i schema.sql och MÅSTE köras om av användaren i SQL Editor innan landsfunktionen fungerar (väntar på användarens "klart").
 - Efter användarens testning: bildbläddring med pilar/svepning (inga vinkeltexter), platssymbol (ikon) i stället för knapp, fältet "Sågs senast" med adressförslag (Photon) och karta med flyttbar markör som visar exakt adress (gata + nummer, område, ort), rasväljare (katt-/hundlistor, Huskatt, Okänd, Blandras med flera raser), land (se Beslut).
-- Cache-busting med ?v=N på skript/stil i docs/index.html (höj N vid varje ändring; senast v=11).
+- Cache-busting med ?v=N på skript/stil i docs/index.html (höj N vid varje ändring; senast v=35).
+- Sidan Borttappade djur: djurslagsknappar (Alla, Katt, Hund, Fåglar, Kaniner, Gnagare, Reptiler, Groddjur, Annat) utan rubriken "Art"; knappen "Filter" fäller ut Ras, Färg, Kön, Försvann (7/30/90 dagar) och Plats (valfria). Kön och Försvann filtreras i appen (inte i databasen). Visat land = hemland från profilen från början, kan bytas överst.
+- Nya djurslag i app och schema.sql: bird, rabbit, rodent, reptile, amphibian (plus cat, dog, other). Raslistor för varje; fri text tillåten för alla utom katt/hund. schema.sql ändrar check-reglerna på pets och found_reports, så den MÅSTE köras om innan nya djurslag går att spara (felmeddelande dbSpecies visas annars).
+- Tomt-läge: kort med korall tass, "Inga borttappade djur just nu" / "Skönt – alla verkar vara hemma." (annan text när filter är aktiva). Undertext på listan: "Hjälp oss hitta hem igen. Håll utkik i ditt område."
+- Ikoner: logga/favicon/Mina djur = klassisk fylld tass roterad 28 grader (alternativ 1), mörkbrun på gul ruta. Favicon finns som SVG, PNG (32/48/192) och ICO med ?v=2 (Safari stöder inte SVG; cachas hårt). Platsknapp och kartmarkör = mörkbrun kartnål med gul tass (alternativ 5).
 - Testat i sandlådan bara mot en låtsas-Supabase (Playwright) och en lokal Postgres; riktiga Supabase, riktiga kartor och riktiga adresstjänster kunde inte nås därifrån och är inte live-testade.
 
 Designval:
 - Färger: solgul #FFD770, ljusgul #FFF3C9, korall #F4806B, ljuskorall #FFE3DC, beige #F6EDE0, mörkbeige #E9DCC8, vit #FFFCF5, text #3A2A1E, dämpad text #7A6552, korallfärgad text på ljuskorall #A8402D. Inget grönt (användarens önskemål).
-- Typsnitt: Nunito. Mobil först, bottennavigering: Borttappade, Mina djur, Hittat djur (stor gul knapp i mitten), Meddelanden, Profil.
+- Typsnitt: Nunito. Mobil först, bottennavigering: Borttappade, Mina djur, Hittat djur (stor gul knapp i mitten, kan bli korall om användaren väljer det), Meddelanden, Profil.
 - Knappar och etiketter har mörk text (vit text på gult/korall blir för svagt).
 
 Beslut om drift (Supabase Free):
@@ -64,11 +68,11 @@ Beslut om drift (Supabase Free):
 - Kod ska ligga i ett privat GitHub-repo (gratis).
 - Webbplatsen driftsätts på gratis värdtjänst, vald senare.
 
-- Sparad designskiss (inte införd): `design/skiss-ljus-korall.html`, ljus korall (#FFC4B8, ytor #FFEDE8) i stället för gult, bakgrunden oförändrad. Användaren funderar; byt inte färger i appen utan besked.
+- Sparad designskiss (inte införd): `design/skiss-ljus-korall.html`, ljus korall (#FFC4B8, ytor #FFEDE8) i stället för gult, bakgrunden oförändrad. Användaren funderar; byt inte färger i appen utan besked. Även skissad (ej sparad, ej införd): bruna ikoner/detaljer i ljus korall (#F68E7C, inaktiva menyikoner #FFC4B8), text oförändrat mörkbrun; frågan om även text ska ändras är obesvarad.
 
 ## Nästa steg
-1. Användaren kör om hela `supabase/schema.sql` i Supabase SQL Editor (nya landsregler) och svarar "klart". Sätt Authentication → URL Configuration → Site URL = https://soltant97.github.io/petfind/ (+ redirect-URL) för lösenordsåterställning.
-2. Testa live med tre konton enligt testkraven (ägare, upphittare, tredje användare; avslag, blockering, återfunnet) samt gästsökning, karta, adressförslag, rasväljare, land (Sverige/Spanien, fel land blockeras). Rätta fel användaren rapporterar.
+1. Användaren kör om hela `supabase/schema.sql` i Supabase SQL Editor (landsregler + nya djurslag + sökfilter) och svarar "klart". Sätt Authentication → URL Configuration → Site URL = https://soltant97.github.io/petfind/ (+ redirect-URL) för lösenordsåterställning.
+2. Testa live med tre konton enligt testkraven (ägare, upphittare, tredje användare; avslag, blockering, återfunnet) samt gästsökning, karta, adressförslag, rasväljare per djurslag, filterpanelen, tomt-läge, kartmarkör, land (Sverige/Spanien, fel land blockeras). Rätta fel användaren rapporterar.
 3. Sveriges 290 kommuner som fast lista (om det fortfarande behövs), fler länder vid behov (ändra check-listor i schema.sql och COUNTRIES i app.js).
 4. Integritetspolicy + samtycke vid registrering, utdrag av egna uppgifter, databehandlaravtal (Supabase), lista leverantörer (Supabase, GitHub Pages, OpenStreetMap, Photon). Låt jurist/dataskyddsexpert granska före lansering. Överväg val "visa bara område offentligt" för adresser.
 5. GitHub Actions: keep-alive och automatisk databaskopia. Överväg privat repo (kräver betald Pages) före lansering; slå på e-postbekräftelse + egen SMTP före lansering.
