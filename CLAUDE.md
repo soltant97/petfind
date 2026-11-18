@@ -23,7 +23,7 @@ Fullständig kravlista och beslut finns i Claude-projektet "Pet Finder APP" (dok
 ## Beslut
 - Gäster (ej inloggade) ser bara startsidan Borttappade djur med de första 6 djuren (skrivskyddat). Att öppna ett djur, byta flik/djurslag/land, använda filter eller bottenmenyn (utom Borttappade) ger en inloggningsruta ("Logga in för att fortsätta": Logga in / Skapa konto / Inte nu). Detta ersätter tidigare regel om att gäster kan söka och göra upphittat-flödet utan konto (beslut 2026-11-18; även AI-bildsökning kräver därmed inloggning tills annat sägs). Gatterat i docs/app.js (showGate, GSEL); språkväxlaren är öppen.
 - Starta från noll (ingen känd befintlig kod).
-- Djur: minst 2 foton, 3 rekommenderas.
+- Djur: minst 2 foton, 3 rekommenderas. Djurets namn får alltid stor första bokstav (capFirst i docs/app.js: medan man skriver och vid sparning; v=73).
 - Återfunnet: anmälan arkiveras, försvinner från publik sökning och vektormängd, historik finns kvar för ägaren.
 - Fyndets datum sätts automatiskt till inskickningstillfället.
 - Blockering är fullständig och valideras i databasen.
