@@ -190,10 +190,32 @@ create unique index if not exists contact_one_pending_found on public.contact_re
 create index if not exists contact_finder_idx on public.contact_requests(finder_id);
 create index if not exists contact_owner_idx on public.contact_requests(owner_id);
 
+-- Anmälningar av användare. Ingen läsrätt för användare; skrivs bara via report_user() och granskas av oss.
+create table if not exists public.user_reports (
+  id uuid primary key default gen_random_uuid(),
+  reporter_id uuid not null references public.profiles(id) on delete cascade,
+  reported_id uuid not null references public.profiles(id) on delete cascade,
+  reason text not null check (reason in ('spam','scam','harassment','inappropriate','other')),
+  details text check (char_length(details) <= 500),
+  created_at timestamptz not null default now(),
+  check (reporter_id <> reported_id)
+);
+alter table public.user_reports enable row level security;
+
 -- Bilder som bifogas en kontaktförfrågan (privata; syns bara för de två parterna)
 alter table public.contact_requests add column if not exists photo_paths text[] not null default '{}';
 alter table public.contact_requests drop constraint if exists contact_requests_photos_max;
 alter table public.contact_requests add constraint contact_requests_photos_max check (cardinality(photo_paths) <= 5);
+
+-- Avstängda chattar (inga notiser om nya meddelanden). Skrivs bara via set_chat_muted().
+create table if not exists public.chat_mutes (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  request_id uuid not null references public.contact_requests(id) on delete cascade,
+  primary key (user_id, request_id)
+);
+alter table public.chat_mutes enable row level security;
+drop policy if exists chat_mutes_own_select on public.chat_mutes;
+create policy chat_mutes_own_select on public.chat_mutes for select to authenticated using (user_id = (select auth.uid()));
 
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
@@ -223,6 +245,8 @@ create or replace function public.notif_respect_prefs() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
   if exists (select 1 from public.profiles where id = new.user_id and new.type = any(notif_off)) then return null; end if;
+  if new.type = 'message' and new.request_id is not null
+     and exists (select 1 from public.chat_mutes where user_id = new.user_id and request_id = new.request_id) then return null; end if;
   return new;
 end $$;
 drop trigger if exists notifications_prefs on public.notifications;
@@ -309,6 +333,7 @@ create policy found_own_delete on public.found_reports for delete to authenticat
 
 -- blocks: man ser bara sina egna. Skapas via block_user().
 grant select on public.blocks to authenticated;
+grant select on public.chat_mutes to authenticated;
 drop policy if exists blocks_own_select on public.blocks;
 create policy blocks_own_select on public.blocks for select to authenticated using (blocker_id = (select auth.uid()));
 
@@ -731,6 +756,60 @@ grant execute on function public.respond_request(uuid, boolean) to authenticated
 grant execute on function public.revoke_request(uuid) to authenticated;
 grant execute on function public.send_message(uuid, text) to authenticated;
 grant execute on function public.mark_read(uuid) to authenticated;
+create or replace function public.set_chat_muted(p_request uuid, p_muted boolean) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Inte inloggad'; end if;
+  if not exists (select 1 from public.contact_requests where id = p_request and auth.uid() in (finder_id, owner_id)) then
+    raise exception 'Samtalet finns inte';
+  end if;
+  if p_muted then
+    insert into public.chat_mutes (user_id, request_id) values (auth.uid(), p_request) on conflict do nothing;
+  else
+    delete from public.chat_mutes where user_id = auth.uid() and request_id = p_request;
+  end if;
+end $$;
+
+-- Offentligt kontokort (inga personuppgifter): avatar, när kontot skapades, hemland och antal aktiva anmälningar
+create or replace function public.get_user_card(p_username text)
+returns table (id uuid, username text, avatar text, created_at timestamptz, home_country text, lost_count int, found_count int)
+language sql stable security definer set search_path = '' as $$
+  select pr.id, pr.username, pr.avatar, pr.created_at, pr.home_country,
+    (select count(*)::int from public.pets p join public.lost_reports lr on lr.pet_id = p.id and lr.status = 'active'
+      where p.owner_id = pr.id and p.status = 'lost'),
+    (select count(*)::int from public.found_reports f where f.finder_id = pr.id and f.is_public and f.closed_at is null)
+  from public.profiles pr
+  where lower(pr.username) = lower(p_username) and not pr.paused;
+$$;
+
+-- Blockera en användare direkt (från användarsidan). Väntande förfrågningar mellan er återkallas.
+create or replace function public.block_user_by_id(p_user uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Inte inloggad'; end if;
+  if p_user = auth.uid() then raise exception 'Du kan inte blockera dig själv'; end if;
+  if not exists (select 1 from public.profiles where id = p_user) then raise exception 'Användaren finns inte'; end if;
+  insert into public.blocks (blocker_id, blocked_id) values (auth.uid(), p_user) on conflict do nothing;
+  update public.contact_requests set status = 'revoked', updated_at = now()
+    where status = 'pending' and ((finder_id = p_user and owner_id = auth.uid()) or (finder_id = auth.uid() and owner_id = p_user));
+end $$;
+
+-- Anmäl en användare (max 10 per dygn)
+create or replace function public.report_user(p_user uuid, p_reason text, p_details text default null) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Inte inloggad'; end if;
+  if p_user = auth.uid() then raise exception 'Du kan inte anmäla dig själv'; end if;
+  if p_reason not in ('spam','scam','harassment','inappropriate','other') then raise exception 'Ogiltig orsak'; end if;
+  if char_length(coalesce(p_details, '')) > 500 then raise exception 'För lång text'; end if;
+  if not exists (select 1 from public.profiles where id = p_user) then raise exception 'Användaren finns inte'; end if;
+  if (select count(*) from public.user_reports where reporter_id = auth.uid() and created_at > now() - interval '1 day') >= 10 then
+    raise exception 'För många anmälningar idag';
+  end if;
+  insert into public.user_reports (reporter_id, reported_id, reason, details)
+    values (auth.uid(), p_user, p_reason, nullif(trim(p_details), ''));
+end $$;
+
 -- Bifoga bilder till sin egen väntande förfrågan (max 5, bara i den egna mappen <användar-id>/contact/)
 create or replace function public.attach_request_photos(p_request uuid, p_paths text[]) returns void
 language plpgsql security definer set search_path = '' as $$
@@ -761,6 +840,10 @@ $$;
 grant execute on function public.block_user(uuid) to authenticated;
 grant execute on function public.unblock_user(uuid) to authenticated;
 grant execute on function public.attach_request_photos(uuid, text[]) to authenticated;
+grant execute on function public.get_user_card(text) to authenticated;
+grant execute on function public.set_chat_muted(uuid, boolean) to authenticated;
+grant execute on function public.block_user_by_id(uuid) to authenticated;
+grant execute on function public.report_user(uuid, text, text) to authenticated;
 grant execute on function public.request_photo_visible(text) to authenticated;
 grant execute on function public.set_avatar(text) to authenticated;
 grant execute on function public.get_notif_off() to authenticated;

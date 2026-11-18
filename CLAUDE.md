@@ -49,7 +49,7 @@ Testmiljö: separat Supabase dev-projekt (djurhittaren-dev), se Status nedan. Te
 - Tidigare gällde att fyndrapporter alltid var privata; privata sparade fynd (saveFind) finns kvar, publika är ett separat val.
 
 ## Avatar (profilbild)
-- Varje användare får en djuravatar som slumpas på servern vid registrering (profiles.avatar, format 'djur:bakgrund:tillbehör', t.ex. fox:3:1; 8 djur, 8 bakgrunder, 4 tillbehör). Flöde: Profil visar avatar + användarnamn + knappen "Redigera profil" (pennikon) → sidan Redigera profil (#/editprofile: avatar, byte av användarnamn) → tryck på avataren → "Redigera avatar" → egen sida #/avatar där djur, bakgrund och tillbehör väljs (set_avatar, validerad i databasen). Ritas som SVG i docs/avatar.js.
+- Varje användare får en djuravatar som slumpas på servern vid registrering (profiles.avatar, format 'djur:bakgrund:tillbehör', t.ex. fox:3:1; 8 djur, 8 bakgrunder, 4 tillbehör). Flöde: Profil → Kontouppgifter (#/editprofile: avatar, användarnamn, e-post, lösenord) → tryck på avataren → "Redigera avatar" → egen sida #/avatar där djur, bakgrund och tillbehör väljs (set_avatar, validerad i databasen). Ritas som SVG i docs/avatar.js.
 - Visas som rund bild bredvid användarnamnet för alla (djurprofiler, upphittade djur, meddelanden, chatt). Avatarer är offentliga och innehåller ingen personinformation. schema.sql MÅSTE köras om.
 
 ## Profilmeny
@@ -59,6 +59,11 @@ Testmiljö: separat Supabase dev-projekt (djurhittaren-dev), se Status nedan. Te
 ## Meddelanden och bilder i förfrågan
 - Meddelanden-sidan (som Instagram): sökruta högst upp (filtrerar på användarnamn bland egna samtal), flikarna "Meddelanden" (öppna chattar: avatar, namn, senaste meddelande, tid, oläst-prick) och "Förfrågningar" (med antal väntande mottagna). Notis om ny förfrågan länkar till #/messages/reqs.
 - Kontaktförfrågan (både "Kontakta ägaren" och "Kontakta upphittaren") kan ha 1–5 bifogade bilder (ta foto eller välj). Bilderna laddas upp i den privata bucketen under <användar-id>/contact/, kopplas via attach_request_photos (bara egen väntande förfrågan, validerad sökväg) och kan läsas bara av förfrågans två parter (storage-policy + request_photo_visible). Visas under förfrågan och överst i chatten.
+
+## Chatt och användarsida (v=45)
+- Chatten visar bara motpartens användarnamn (ingen rubrik "Privat chatt"), färgad bakgrund bakom bubblorna, avatar bredvid varje bubbla, tid + bockar under egna bubblor (✓ skickat, ✓✓ läst via messages.read_at). Ingen blockeringsknapp under chatten.
+- Tryck på användaren i chattens topp → meny: Profil (→ #/user/<namn>), Sök (sök i chatten), Stäng av/Slå på notiser (chat_mutes + set_chat_muted; trigger hoppar över 'message'-notiser för tystade chattar), Alternativ → Blockera, Anmäl.
+- Användarsida #/user/<namn> (get_user_card): avatar + namn + tre punkter → Blockera/Avblockera (block_user_by_id), Anmäl (report_user → tabellen user_reports, orsaker spam/scam/harassment/inappropriate/other, max 10/dag; ingen admin-vy än), Om det här kontot (medlemsdatum, hemland, antal aktiva efterlysningar/upphittade), Skicka meddelande (bara om godkänd chatt finns). Alla användarnamn i appen länkar dit. schema.sql MÅSTE köras om.
 
 ## Status (uppdaterad 2026-11-18)
 Klart:
@@ -70,7 +75,7 @@ Byggt och uppladdat (GitHub Pages: https://soltant97.github.io/petfind/, repo so
 - Webbapp kopplad till Supabase (docs/app.js, db.js, config.js med publishable-nyckel): registrering/inloggning/återställ lösenord, djurregistrering med ≥2 foton (bilder skalas ned till 1024 px), borttappat/återfunnet, offentlig sökning, upphittat-flöde med textmatchning, kontaktförfrågan, godkänn/avböj/återkalla, privat chatt med realtid, notiser (oläst-siffra), blockering, byte av användarnamn, pausa/radera konto, sv/en.
 - Databasen (schema.sql) är körd i djurhittaren-dev av användaren och går att köra om. Nya landsregler (hemland, p_country-filter, report_lost med p_country + p_device_country, set_home_country) ligger i schema.sql och MÅSTE köras om av användaren i SQL Editor innan landsfunktionen fungerar (väntar på användarens "klart").
 - Efter användarens testning: bildbläddring med pilar/svepning (inga vinkeltexter), platssymbol (ikon) i stället för knapp, fältet "Sågs senast" med adressförslag (Photon) och karta med flyttbar markör som visar exakt adress (gata + nummer, område, ort), rasväljare (katt-/hundlistor, Huskatt, Okänd, Blandras med flera raser), land (se Beslut).
-- Cache-busting med ?v=N på skript/stil i docs/index.html (höj N vid varje ändring; senast v=44).
+- Cache-busting med ?v=N på skript/stil i docs/index.html (höj N vid varje ändring; senast v=45).
 - Sidan Borttappade djur: djurslagsknappar (Alla, Katt, Hund, Fåglar, Kaniner, Gnagare, Reptiler, Annat) utan rubriken "Art"; knappen "Filter" fäller ut Ras, Färg, Kön, Försvann (7/30/90 dagar) och Plats (valfria). Kön och Försvann filtreras i appen (inte i databasen). Visat land = hemland från profilen från början, kan bytas överst.
 - Nya djurslag i app och schema.sql: bird, rabbit, rodent, reptile (plus cat, dog, other). Raslistor för varje; fri text tillåten för alla utom katt/hund. schema.sql ändrar check-reglerna på pets och found_reports, så den MÅSTE köras om innan nya djurslag går att spara (felmeddelande dbSpecies visas annars).
 - Tomt-läge: kort med korall tass, "Inga borttappade djur just nu" / "Skönt – alla verkar vara hemma." (annan text när filter är aktiva). Undertext på listan: "Hjälp oss hitta hem igen. Håll utkik i ditt område."
