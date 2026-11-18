@@ -168,3 +168,4 @@ body.inchat .chatbg>:first-child{margin-top:auto}
 .linkbtn{border:0;background:transparent;font:inherit;font-weight:800;color:var(--m);padding:10px;cursor:pointer}
 .seemore{width:100%;border:2px dashed rgba(58,42,30,.25);background:var(--db);border-radius:18px;padding:16px;font:inherit;font-weight:800;color:var(--t);cursor:pointer;margin-top:4px}
 .hero .savebtn{position:absolute;right:16px;top:16px;width:44px;height:44px;border-radius:50%;border:0;background:#fff;box-shadow:0 2px 8px rgba(58,42,30,.15);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2}.hero .savebtn.on{background:var(--y)}
+.pwmatch{min-height:20px;font-weight:800}.pwmatch.ok{color:var(--t)}.pwmatch.bad{color:#A8402D}
