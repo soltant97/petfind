@@ -117,5 +117,5 @@ Beslut om drift (Supabase Free):
 ## Djursidan och listor (v=86)
 - Djurprofilen har egna sektioner: Djur (var "Art"), Kön, Ålder; sedan Färg, Ras, Ögonfärg/Storlek/Halsband, Senast sedd, Sedd datum, Kännetecken, Beskrivning (= efterlysningens omständigheter). Ägare visas som en rad: avatar + användarnamn (ingen förklaringstext). "Kontakta ägaren/upphittaren" har meddelande-ikon.
 - Ålder visas från födelsedatum: under 12 månader i månader (avrundat upp när mer än 15 dagar av månaden gått, <1 månad = "Mindre än 1 månad"), annars hela år. get_lost_pets/search_lost_pets/get_lost_pet returnerar age_months (schema.sql MÅSTE köras om). Djurnamn visas alltid med stor första bokstav (capFirst).
-- Listkort visar bara ort (last_city), hela adressen först på djursidan (v=87). Kommun lagras inte separat.
+- Listkort visar bara ort, inte färg; sparaknappen ligger nere till höger på kortet (v=88). Ort (last_city), hela adressen först på djursidan (v=87). Kommun lagras inte separat.
 - Sparaknapp (bokmärke) finns även på korten i listor (inloggad, ej egna inlägg); tmp.sv håller sparade nycklar.

@@ -184,3 +184,4 @@ body.inchat .chatbg>:first-child{margin-top:auto}
 .ownerrow{display:flex;align-items:center;gap:10px;margin:12px 0;font-size:16px}
 .secbox{margin-top:10px;grid-column:auto}.secbox b{display:block;font-weight:700;line-height:1.4;margin-top:2px}
 .card .ph{position:relative}.savebtn.cardsave{position:absolute;right:4px;top:4px;width:32px;height:32px;border-radius:50%;border:0;background:#fff;box-shadow:0 1px 5px rgba(58,42,30,.25);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;z-index:2}.savebtn.cardsave svg{width:18px;height:18px}.savebtn.cardsave.on{background:var(--y)}
+a.card{position:relative}.savebtn.cardsave{right:10px;top:auto;bottom:10px;width:36px;height:36px}.card .grow{padding-right:4px}
