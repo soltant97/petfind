@@ -52,6 +52,10 @@ Testmiljö: separat Supabase dev-projekt (djurhittaren-dev), se Status nedan. Te
 - Varje användare får en djuravatar som slumpas på servern vid registrering (profiles.avatar, format 'djur:bakgrund:tillbehör', t.ex. fox:3:1; 8 djur, 8 bakgrunder, 4 tillbehör). Flöde: Profil visar avatar + användarnamn + knappen "Redigera profil" (pennikon) → sidan Redigera profil (#/editprofile: avatar, byte av användarnamn) → tryck på avataren → "Redigera avatar" → egen sida #/avatar där djur, bakgrund och tillbehör väljs (set_avatar, validerad i databasen). Ritas som SVG i docs/avatar.js.
 - Visas som rund bild bredvid användarnamnet för alla (djurprofiler, upphittade djur, meddelanden, chatt). Avatarer är offentliga och innehåller ingen personinformation. schema.sql MÅSTE köras om.
 
+## Profilmeny
+- Profilsidan är en lista med kategorier (varje öppnar en egen sida): Kontouppgifter (avatar via tryck → Redigera avatar, användarnamn, e-post och lösenord – alla redigerbara; e-postbyte kräver bekräftelselänk), Notiser (lista + markera alla lästa), Blockerade användare (avblockera via unblock_user), Region (hemland + språk), Integritet, Användarvillkor, Kontakt och säkerhet, Betygsätt appen, Logga ut, Inaktivera eller radera konto, Version.
+- Texterna för Integritet och Användarvillkor är preliminära sammanfattningar och MÅSTE granskas av jurist före lansering. Kontaktväg till support och betygsättning (App Store/Google Play) finns inte än – sidorna säger det ärligt.
+
 ## Status (uppdaterad 2026-11-18)
 Klart:
 - Mapp och denna CLAUDE.md skapade. Kravdokumentet "krav-och-beslut" ligger i Claude-projektet.
@@ -62,7 +66,7 @@ Byggt och uppladdat (GitHub Pages: https://soltant97.github.io/petfind/, repo so
 - Webbapp kopplad till Supabase (docs/app.js, db.js, config.js med publishable-nyckel): registrering/inloggning/återställ lösenord, djurregistrering med ≥2 foton (bilder skalas ned till 1024 px), borttappat/återfunnet, offentlig sökning, upphittat-flöde med textmatchning, kontaktförfrågan, godkänn/avböj/återkalla, privat chatt med realtid, notiser (oläst-siffra), blockering, byte av användarnamn, pausa/radera konto, sv/en.
 - Databasen (schema.sql) är körd i djurhittaren-dev av användaren och går att köra om. Nya landsregler (hemland, p_country-filter, report_lost med p_country + p_device_country, set_home_country) ligger i schema.sql och MÅSTE köras om av användaren i SQL Editor innan landsfunktionen fungerar (väntar på användarens "klart").
 - Efter användarens testning: bildbläddring med pilar/svepning (inga vinkeltexter), platssymbol (ikon) i stället för knapp, fältet "Sågs senast" med adressförslag (Photon) och karta med flyttbar markör som visar exakt adress (gata + nummer, område, ort), rasväljare (katt-/hundlistor, Huskatt, Okänd, Blandras med flera raser), land (se Beslut).
-- Cache-busting med ?v=N på skript/stil i docs/index.html (höj N vid varje ändring; senast v=39).
+- Cache-busting med ?v=N på skript/stil i docs/index.html (höj N vid varje ändring; senast v=40).
 - Sidan Borttappade djur: djurslagsknappar (Alla, Katt, Hund, Fåglar, Kaniner, Gnagare, Reptiler, Annat) utan rubriken "Art"; knappen "Filter" fäller ut Ras, Färg, Kön, Försvann (7/30/90 dagar) och Plats (valfria). Kön och Försvann filtreras i appen (inte i databasen). Visat land = hemland från profilen från början, kan bytas överst.
 - Nya djurslag i app och schema.sql: bird, rabbit, rodent, reptile (plus cat, dog, other). Raslistor för varje; fri text tillåten för alla utom katt/hund. schema.sql ändrar check-reglerna på pets och found_reports, så den MÅSTE köras om innan nya djurslag går att spara (felmeddelande dbSpecies visas annars).
 - Tomt-läge: kort med korall tass, "Inga borttappade djur just nu" / "Skönt – alla verkar vara hemma." (annan text när filter är aktiva). Undertext på listan: "Hjälp oss hitta hem igen. Håll utkik i ditt område."

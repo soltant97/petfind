@@ -109,3 +109,12 @@ select:disabled{opacity:.6}
 .avtap::after{content:'';position:absolute;right:-2px;bottom:-2px;width:26px;height:26px;border-radius:50%;background:var(--y) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233A2A1E' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 19h3.5L18 9.5 14.5 6 5 15.5z'/%3E%3C/svg%3E") center/16px no-repeat;box-shadow:0 0 0 2px var(--w)}
 .sheetbg{position:fixed;inset:0;background:rgba(58,42,30,.45);z-index:900}
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:901;background:var(--w);border-radius:22px 22px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;max-width:520px;margin:0 auto}
+.menu{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.mrow{display:flex;align-items:center;gap:14px;min-height:56px;padding:8px 14px;background:var(--b);border:0;border-radius:16px;text-decoration:none;color:var(--t);font:inherit;font-weight:800;text-align:left;width:100%;cursor:pointer}
+div.mrow{cursor:default}
+.mrow .mi{display:flex;flex:none;width:36px;height:36px;border-radius:50%;background:var(--y);align-items:center;justify-content:center}
+.mrow .ml{flex:1;min-width:0}.mch{font-size:24px;color:var(--m);font-weight:700}.mval{color:var(--m);font-weight:700}
+.mbadge{background:var(--c);color:var(--t);border-radius:999px;min-width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;padding:0 6px}
+.unreadrow{background:var(--ly);box-shadow:inset 4px 0 0 var(--c)}
+.ptext{margin:4px 0 0;line-height:1.45;font-weight:600}
+.menu{margin-bottom:24px}

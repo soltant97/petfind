@@ -59,6 +59,7 @@
     async signIn(email, password) { const r = await sb.auth.signInWithPassword({ email, password }); if (r.error) throw r.error; return r.data; },
     async signOut() { await sb.auth.signOut(); },
     async resetPassword(email) { const r = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname }); if (r.error) throw r.error; },
+    async changeEmail(email) { const r = await sb.auth.updateUser({ email }, { emailRedirectTo: location.origin + location.pathname }); if (r.error) throw r.error; },
     async setPassword(pw) { const r = await sb.auth.updateUser({ password: pw }); if (r.error) throw r.error; },
     /* avatarer är offentliga (inga personuppgifter); hämtas per användarnamn och cachas */
     avCache: {},
@@ -197,6 +198,10 @@
     async markRead(reqId) { ok(await sb.rpc('mark_read', { p_request: reqId })); },
     async block(reqId) { ok(await sb.rpc('block_user', { p_request: reqId })); },
     async blockedIds() { return ok(await sb.from('blocks').select('blocked_id')).map((x) => x.blocked_id); },
+    async blockedList() { return ok(await sb.from('blocks').select('blocked_id,created_at,blocked:profiles!blocked_id(username,avatar)').order('created_at', { ascending: false })); },
+    async unblock(userId) { ok(await sb.rpc('unblock_user', { p_user: userId })); },
+    async notifications() { return ok(await sb.from('notifications').select('id,type,request_id,pet_name,created_at,read_at').order('created_at', { ascending: false }).limit(50)); },
+    async markAllNotifs() { ok(await sb.from('notifications').update({ read_at: new Date().toISOString() }).is('read_at', null)); },
     async unreadCount() {
       const r = await sb.from('notifications').select('id', { count: 'exact', head: true }).is('read_at', null);
       return r.error ? 0 : (r.count || 0);

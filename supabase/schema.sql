@@ -682,7 +682,13 @@ grant execute on function public.respond_request(uuid, boolean) to authenticated
 grant execute on function public.revoke_request(uuid) to authenticated;
 grant execute on function public.send_message(uuid, text) to authenticated;
 grant execute on function public.mark_read(uuid) to authenticated;
+-- Avblockera en användare man själv blockerat
+create or replace function public.unblock_user(p_user uuid) returns void
+language sql security definer set search_path = '' as $$
+  delete from public.blocks where blocker_id = auth.uid() and blocked_id = p_user;
+$$;
 grant execute on function public.block_user(uuid) to authenticated;
+grant execute on function public.unblock_user(uuid) to authenticated;
 grant execute on function public.delete_my_account() to authenticated;
 
 -- =====================================================================
