@@ -6,9 +6,10 @@
   const FUR = { cat: '#D9955A', dog: '#C69463', rabbit: '#F5EADB', fox: '#E5763F', bear: '#946447', panda: '#FFFCF5', mouse: '#C4BAB0', bird: '#FFD23F', hamster: '#E8B77A', guineapig: '#C98B5A', parrot: '#E5483B', chicken: '#FFFCF5', squirrel: '#C9783C', zebra: '#FFFCF5', horse: '#A66A3F', lion: '#F0B259', monkey: '#8A5A3C', pig: '#F6B3B0', cow: '#FFFCF5', tiger: '#F08A2E' };
   const re = /^(cat|dog|rabbit|fox|bear|panda|mouse|bird|hamster|guineapig|parrot|chicken|squirrel|zebra|horse|lion|monkey|pig|cow|tiger):[0-7]:[0-9](:(?:[0-9]|1[0-5]))?$/;
   const ok = (c) => re.test(c || '');
-  const random = () => { const a = ANIMALS[Math.floor(Math.random() * ANIMALS.length)], fl = furFor(a), fu = fl[Math.floor(Math.random() * fl.length)]; return a + ':' + Math.floor(Math.random() * 8) + ':' + Math.floor(Math.random() * 4) + (fu ? ':' + fu : ''); };
+  const random = () => ANIMALS[Math.floor(Math.random() * ANIMALS.length)] + ':' + Math.floor(Math.random() * 8) + ':' + Math.floor(Math.random() * 9) + ':' + Math.floor(Math.random() * 5);
   const code = (c) => c.a + ':' + c.b + ':' + c.x + (c.c ? ':' + c.c : '');
-  const parse = (c) => { const p = (ok(c) ? c : 'cat:0:0').split(':'); return { a: p[0], b: +p[1], x: +p[2], c: p[3] ? +p[3] : 0 }; };
+  /* Fjärde delen i koden = pose 0–4 (0 = standard). Äldre koder med större tal tolkas som standard. */
+  const parse = (c) => { const p = (ok(c) ? c : 'cat:0:0').split(':'); return { a: p[0], b: +p[1], x: +p[2], c: p[3] && +p[3] <= 4 ? +p[3] : 0 }; };
   const TOKEN = '#FE00FE';
   const FURS = [null,
     { c: '#FFFCF5', sv: 'Vit', en: 'White' }, { c: '#3B3431', sv: 'Svart', en: 'Black' }, { c: '#A8A29E', sv: 'Grå', en: 'Grey' },
@@ -24,6 +25,28 @@
   const tone = (c, dl) => { const [h, s, l] = toHsl(c); return fromHsl(h, s, Math.max(0.06, Math.min(0.94, l + dl))); };
   /* Andra färgen i tvåfärgade djur (panda, zebra, ko, tiger): samma nyans men tydligt mörkare eller ljusare */
   const contrast = (c) => { const [h, s, l] = toHsl(c); return lum(c) > 0.3 ? fromHsl(h, Math.min(s, 0.45), 0.2) : fromHsl(h, Math.min(s, 0.5), 0.9); };
+  /* Pose: 0 standard, 1 blinkning, 2 glad, 3 kärlek, 4 sömnig. Sätts i svg() innan djuret ritas. */
+  let POSE = 0;
+  const sclera = (x, y) => `<circle cx="${x}" cy="${y}" r="4.4" fill="#FFFCF5" stroke="#3A2A1E" stroke-opacity="0.35" stroke-width="0.8"/><circle cx="${x + (x < 50 ? 0.5 : -0.5)}" cy="${y + 0.5}" r="2.700" fill="#3A2A1E"/><circle cx="${x + (x < 50 ? 1.5 : 0.5)}" cy="${y - 0.6}" r="0.9" fill="#FFFCF5"/>`;
+  const happy = (x, y, c) => `<path d="M${x - 4.5} ${y + 1.5}Q${x} ${y - 5} ${x + 4.5} ${y + 1.5}" fill="none" stroke="${c}" stroke-width="2.400" stroke-linecap="round"/>`;
+  const sleepy = (x, y, c) => `<path d="M${x - 4.5} ${y}Q${x} ${y + 3} ${x + 4.5} ${y}" fill="none" stroke="${c}" stroke-width="2.400" stroke-linecap="round"/>`;
+  const heart = (x, y, k, c) => `<path transform="translate(${x} ${y}) scale(${k})" d="M0 4.500C-7 -1 -4.500 -7.500 0 -3.500C4.500 -7.500 7 -1 0 4.500Z" fill="${c || '#E5483B'}"/>`;
+  const eyePose = (xl, xr, y, col) => {
+    if (POSE === 1) return sclera(xl, y) + happy(xr, y, col);
+    if (POSE === 2) return happy(xl, y, col) + happy(xr, y, col);
+    if (POSE === 3) return heart(xl, y, 1.15) + heart(xr, y, 1.15);
+    if (POSE === 4) return sleepy(xl, y, col) + sleepy(xr, y, col);
+    return sclera(xl, y) + sclera(xr, y);
+  };
+  /* Extra detaljer runt djuret för varje pose (ritas ovanpå, inte lutade). */
+  const poseExtra = () => {
+    if (POSE === 1) return `<path d="M82 14l2 6 6 2-6 2-2 6-2-6-6-2 6-2Z" fill="#FFD23F" stroke="#E0A81C" stroke-width="0.8" stroke-linejoin="round"/>`;
+    if (POSE === 2) return `<ellipse cx="27" cy="64" rx="5" ry="3" fill="#F4806B" opacity="0.4"/><ellipse cx="73" cy="64" rx="5" ry="3" fill="#F4806B" opacity="0.4"/>`;
+    if (POSE === 3) return heart(82, 20, 1.1) + heart(91, 34, 0.7) + heart(14, 24, 0.8);
+    if (POSE === 4) return `<g fill="none" stroke="#7A6552" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M72 16h8l-8 9h8"/><path d="M84 6h5l-5 6h5"/></g>`;
+    return '';
+  };
+  const TILT = [0, 8, 0, 0, -8];
   const faceRaw = (a, fur) => {
     const nat = !fur;
     const fc = nat ? FUR[a] : FURS[fur].c;
@@ -37,7 +60,7 @@
     const nz = lum(mz) < 0.3 ? '#F3E6D8' : '#3A2A1E';
     const dk3 = nat ? '#3A2A1E' : lum(fc) < 0.15 ? tone(fc, 0.3) : tone(fc, -0.3);
     const dark = !nat && lum(fc) < 0.2;
-    const eyesAt = (xl, xr, y) => [[xl, 0.5, 1.5], [xr, -0.5, 0.5]].map(([x, dx, hx]) => `<circle cx="${x}" cy="${y}" r="4.4" fill="#FFFCF5" stroke="#3A2A1E" stroke-opacity="0.35" stroke-width="0.8"/><circle cx="${x + dx}" cy="${y + 0.5}" r="2.700" fill="#3A2A1E"/><circle cx="${x + hx}" cy="${y - 0.6}" r="0.9" fill="#FFFCF5"/>`).join('');
+    const eyesAt = (xl, xr, y, col) => eyePose(xl, xr, y, col || '#3A2A1E');
     const eyes = eyesAt(39, 61, 54);
     const mouth = `<path d="M44 66q6 5 12 0" fill="none" stroke="${D}" stroke-width="2.4" stroke-linecap="round"/>`;
     const nose = `<ellipse cx="50" cy="62" rx="4" ry="3" fill="${D}"/>`;
@@ -48,11 +71,11 @@
       case 'rabbit': return `<ellipse cx="38" cy="26" rx="8" ry="22" fill="${f}"/><ellipse cx="62" cy="26" rx="8" ry="22" fill="${f}"/><ellipse cx="38" cy="27" rx="4" ry="15" fill="#F4A9A0"/><ellipse cx="62" cy="27" rx="4" ry="15" fill="#F4A9A0"/>${head}${eyes}<ellipse cx="50" cy="62" rx="3.5" ry="2.8" fill="#E8838A"/>${mouth}`;
       case 'fox': return `<path d="M20 46L24 12L46 30Z M80 46L76 12L54 30Z" fill="${f}"/><path d="M27 36L28 22L38 31Z M73 36L72 22L62 31Z" fill="${dk3}"/>${head}<path d="M22 62Q50 92 78 62Q64 58 50 66Q36 58 22 62Z" fill="#FFFCF5"/>${eyes}<ellipse cx="50" cy="63" rx="4" ry="3" fill="${D}"/>`;
       case 'bear': return `<circle cx="24" cy="32" r="11" fill="${f}"/><circle cx="76" cy="32" r="11" fill="${f}"/><circle cx="24" cy="32" r="5.5" fill="${tn('#C99A78',0.12)}"/><circle cx="76" cy="32" r="5.5" fill="${tn('#C99A78',0.12)}"/>${head}<ellipse cx="50" cy="65" rx="12" ry="9.5" fill="${tn('#E8C9A8',0.22)}"/>${eyes}${nose}${mouth}`;
-      case 'panda': return `<circle cx="24" cy="32" r="11" fill="${p2}"/><circle cx="76" cy="32" r="11" fill="${p2}"/>${head}<ellipse cx="38" cy="54" rx="8" ry="10" fill="${p2}" transform="rotate(-18 38 54)"/><ellipse cx="62" cy="54" rx="8" ry="10" fill="${p2}" transform="rotate(18 62 54)"/>${eyesAt(38.5, 61.5, 54)}${nose}${mouth}`;
+      case 'panda': return `<circle cx="24" cy="32" r="11" fill="${p2}"/><circle cx="76" cy="32" r="11" fill="${p2}"/>${head}<ellipse cx="38" cy="54" rx="8" ry="10" fill="${p2}" transform="rotate(-18 38 54)"/><ellipse cx="62" cy="54" rx="8" ry="10" fill="${p2}" transform="rotate(18 62 54)"/>${eyesAt(38.5, 61.5, 54, '#FFFCF5')}${nose}${mouth}`;
       case 'mouse': return `<circle cx="24" cy="34" r="14" fill="${f}"/><circle cx="76" cy="34" r="14" fill="${f}"/><circle cx="24" cy="34" r="8" fill="#F4A9A0"/><circle cx="76" cy="34" r="8" fill="#F4A9A0"/>${head}${eyes}<ellipse cx="50" cy="61" rx="3.6" ry="2.8" fill="#E8838A"/>${mouth}<path d="M18 58h13M18 64l12-3M82 58H69M82 64L70 61" stroke="${D}" stroke-width="1.4" stroke-linecap="round"/>`;
       case 'hamster': return `<circle cx="28" cy="32" r="10" fill="${f}"/><circle cx="72" cy="32" r="10" fill="${f}"/><circle cx="28" cy="32" r="5" fill="#F4A9A0"/><circle cx="72" cy="32" r="5" fill="#F4A9A0"/><ellipse cx="50" cy="57" rx="33" ry="27" fill="${f}"/><ellipse cx="50" cy="42" rx="10" ry="8" fill="#FFFCF5"/><ellipse cx="34" cy="66" rx="13" ry="10" fill="#F8E6CC"/><ellipse cx="66" cy="66" rx="13" ry="10" fill="#F8E6CC"/>${eyes}<ellipse cx="50" cy="61" rx="3.6" ry="2.8" fill="#E88A8A"/><path d="M45 67q5 4 10 0" fill="none" stroke="${D}" stroke-width="2.2" stroke-linecap="round"/><rect x="47.500" y="68" width="5" height="5" rx="1" fill="#FFFCF5" stroke="${D}" stroke-width="1"/>`;
       case 'guineapig': return `<ellipse cx="22" cy="42" rx="10" ry="8" fill="${tn('#9E6A44',-0.12)}" transform="rotate(-20 22 42)"/><ellipse cx="78" cy="42" rx="10" ry="8" fill="${tn('#9E6A44',-0.12)}" transform="rotate(20 78 42)"/>${head}<ellipse cx="50" cy="44" rx="9" ry="14" fill="#FFFCF5"/><ellipse cx="50" cy="68" rx="12" ry="9" fill="#F3DFC6"/>${eyes}<ellipse cx="50" cy="62" rx="3.800" ry="2.800" fill="#E88A8A"/><path d="M45 70q5 4 10 0" fill="none" stroke="${D}" stroke-width="2.2" stroke-linecap="round"/>`;
-      case 'parrot': return `<ellipse cx="42" cy="22" rx="5" ry="11" fill="#3B7DD8" transform="rotate(-18 42 22)"/><ellipse cx="50" cy="19" rx="5" ry="12" fill="#F4C542"/><ellipse cx="58" cy="22" rx="5" ry="11" fill="#3B7DD8" transform="rotate(18 58 22)"/><circle cx="50" cy="55" r="30" fill="${f}"/><ellipse cx="37" cy="52" rx="11" ry="10" fill="#FFFCF5"/><ellipse cx="63" cy="52" rx="11" ry="10" fill="#FFFCF5"/><circle cx="39" cy="52" r="3.400" fill="#3A2A1E"/><circle cx="61" cy="52" r="3.400" fill="#3A2A1E"/><circle cx="40.200" cy="50.800" r="1" fill="#FFFCF5"/><circle cx="62.200" cy="50.800" r="1" fill="#FFFCF5"/><path d="M41 62Q50 54 59 62Q58 80 50 82Q42 80 41 62Z" fill="#F4C542"/><path d="M45 70h10" stroke="${D}" stroke-width="2" stroke-linecap="round"/>`;
+      case 'parrot': return `<ellipse cx="42" cy="22" rx="5" ry="11" fill="#3B7DD8" transform="rotate(-18 42 22)"/><ellipse cx="50" cy="19" rx="5" ry="12" fill="#F4C542"/><ellipse cx="58" cy="22" rx="5" ry="11" fill="#3B7DD8" transform="rotate(18 58 22)"/><circle cx="50" cy="55" r="30" fill="${f}"/><ellipse cx="37" cy="52" rx="11" ry="10" fill="#FFFCF5"/><ellipse cx="63" cy="52" rx="11" ry="10" fill="#FFFCF5"/>${POSE ? eyePose(39, 61, 52, "#3A2A1E") : '<circle cx="39" cy="52" r="3.400" fill="#3A2A1E"/><circle cx="61" cy="52" r="3.400" fill="#3A2A1E"/><circle cx="40.200" cy="50.800" r="1" fill="#FFFCF5"/><circle cx="62.200" cy="50.800" r="1" fill="#FFFCF5"/>'}<path d="M41 62Q50 54 59 62Q58 80 50 82Q42 80 41 62Z" fill="#F4C542"/><path d="M45 70h10" stroke="${D}" stroke-width="2" stroke-linecap="round"/>`;
       case 'chicken': return `<circle cx="41" cy="27" r="7" fill="#E5483B"/><circle cx="50" cy="22" r="8" fill="#E5483B"/><circle cx="59" cy="27" r="7" fill="#E5483B"/><circle cx="50" cy="56" r="29" fill="${f}" stroke="#E9DCC8" stroke-width="2"/><ellipse cx="50" cy="79" rx="4.500" ry="7" fill="#E5483B"/><path d="M42 60L58 60L50 73Z" fill="#F4A24D"/>${eyes}`;
       case 'squirrel': return `<ellipse cx="84" cy="44" rx="13" ry="26" fill="${tn('#A85F2C',-0.12)}" transform="rotate(14 84 44)"/><path d="M24 40L28 14L46 30Z M76 40L72 14L54 30Z" fill="${f}"/>${head}<ellipse cx="50" cy="66" rx="13" ry="10" fill="#F8E6CC"/>${eyes}<ellipse cx="50" cy="62" rx="3.600" ry="2.800" fill="${D}"/><path d="M45 69q5 4 10 0" fill="none" stroke="${D}" stroke-width="2.200" stroke-linecap="round"/><rect x="46.500" y="70" width="3.500" height="6" rx="1" fill="#FFFCF5" stroke="${D}" stroke-width="1"/><rect x="50" y="70" width="3.500" height="6" rx="1" fill="#FFFCF5" stroke="${D}" stroke-width="1"/>`;
       case 'zebra': return `<path d="M30 8L40 36L22 34Z M70 8L78 34L60 36Z" fill="${nat ? p2 : f}"/><path d="M38 10l-3 16M33 12l-5 14M62 10l3 16M67 12l5 14" stroke="${nat ? '#FFFCF5' : p2}" stroke-width="2"/><ellipse cx="50" cy="54" rx="27" ry="31" fill="${f}" stroke="${tn('#E9DCC8', -0.1)}" stroke-width="2"/><path d="M50 26v16M40 28l3 14M60 28l-3 14M23 50l9 4M24 60l9 3M77 50l-9 4M76 60l-9 3" stroke="${p2}" stroke-width="4" stroke-linecap="round"/>${eyes}<ellipse cx="50" cy="70" rx="14" ry="11" fill="${mz}"/><circle cx="44" cy="70" r="2.200" fill="${nz}"/><circle cx="56" cy="70" r="2.200" fill="${nz}"/>`;
@@ -98,7 +121,7 @@
   /* Rund profilbild. size i px. */
   function svg(code, size, label) {
     const p = parse(code), s = size || 40;
-    return `<span class="av" style="width:${s}px;height:${s}px" role="img" aria-label="${label || 'Avatar'}"><svg viewBox="0 0 100 100" width="${s}" height="${s}" aria-hidden="true"><rect width="100" height="100" fill="${COLORS[p.b]}"/>${face(p.a, p.c)}${acc(p.x)}</svg></span>`;
+    return `<span class="av" style="width:${s}px;height:${s}px" role="img" aria-label="${label || 'Avatar'}"><svg viewBox="0 0 100 100" width="${s}" height="${s}" aria-hidden="true"><rect width="100" height="100" fill="${COLORS[p.b]}"/>${(POSE = p.c, '')}<g transform="rotate(${TILT[p.c]} 50 62)">${face(p.a, 0)}${acc(p.x)}</g>${poseExtra()}</svg></span>`;
   }
-  window.AVATAR = { ANIMALS, COLORS, FURS, FUR, BGS: [0, 1, 2, 3, 4, 5, 7], ACCS: [0, 1, 2, 3, 4, 5, 6, 7, 8], random, parse, code, ok, svg, accSvg, furFor };
+  window.AVATAR = { POSES: [0, 1, 2, 3, 4], ANIMALS, COLORS, FURS, FUR, BGS: [0, 1, 2, 3, 4, 5, 7], ACCS: [0, 1, 2, 3, 4, 5, 6, 7, 8], random, parse, code, ok, svg, accSvg, furFor };
 })();
