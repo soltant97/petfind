@@ -138,7 +138,7 @@ div.mrow{cursor:default}
 input[type=search]{width:100%;border:1.5px solid var(--db);background:#fff;border-radius:999px;padding:12px 16px;font-size:16px;min-height:46px;font-family:inherit;color:var(--t);-webkit-appearance:none;appearance:none}
 .atts{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.atts img{width:76px;height:76px;object-fit:cover;border-radius:12px;display:block}
 .chathdr{padding-bottom:6px}.chathdr .spacer{width:44px}
-.chatwho{display:flex;align-items:center;gap:10px;background:transparent;border:0;padding:4px 8px;cursor:pointer;font:inherit;color:var(--t);min-width:0;flex:1;justify-content:flex-start}
+.chatwho{display:flex;align-items:center;gap:10px;border:2px solid rgba(58,42,30,.10);border-radius:20px;box-shadow:0 2px 6px rgba(58,42,30,.10);padding:6px 12px 6px 8px;cursor:pointer;font:inherit;color:var(--t);min-width:0;flex:1;justify-content:flex-start}
 .cwn{display:flex;flex-direction:column;align-items:flex-start;min-width:0;text-align:left}.cwn b{font-size:18px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.cwn small{color:var(--m);font-weight:600;font-size:12px}
 .chatbg{background:var(--db);border-radius:22px;padding:14px 10px;gap:12px;min-height:40vh}
 .cm{display:flex;gap:8px;align-items:flex-start}.cm>.av{margin-top:5px;flex:none}.cm.me{flex-direction:row-reverse}
@@ -153,3 +153,5 @@ input[type=search]{width:100%;border:1.5px solid var(--db);background:#fff;borde
 .sheetrow.danger{color:var(--ct)}
 .sheet{max-height:85vh;overflow:auto}
 a.uchip{text-decoration:none;color:inherit}
+.chatwho.cc0{background:#FFE3DC}.chatwho.cc1{background:#FFF3C9}.chatwho.cc2{background:#E9DCC8}.chatwho.cc3{background:#FFD9C2}.chatwho.cc4{background:#F7E4A8}
+.chatwho .cwn{flex:1}.chatwho .chev{flex:none}
