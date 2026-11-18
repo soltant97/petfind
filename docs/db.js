@@ -37,6 +37,11 @@
     };
   }
 
+  const fromFound = (r) => ({
+    id: r.id, kind: 'found', name: r.species, species: r.species, breed: '', color: r.color || '', place: r.place, city: r.city,
+    date: r.found_on, desc: r.description || '', finder: r.finder_username, photos: r.photo_paths || [], status: 'found-post'
+  });
+
   const DB = {
     sb,
     /* ----- konto ----- */
@@ -131,6 +136,34 @@
     async setHomeCountry(c) { ok(await sb.rpc('set_home_country', { p_country: c })); },
     async markFound(id) { ok(await sb.rpc('mark_found', { p_pet: id })); },
     async setRegistered(id) { ok(await sb.from('pets').update({ status: 'registered' }).eq('id', id)); },
+    /* ----- upphittade djur (publika anmälningar) ----- */
+    async searchFound(f, species, country) {
+      f = f || {};
+      const rows = ok(await sb.rpc('search_found_pets', { p_species: species === 'all' ? null : species, p_country: country || null, p_color: f.color || null, p_place: f.place || null }));
+      return attach(rows.map(fromFound));
+    },
+    async getFound(id) {
+      const rows = ok(await sb.rpc('get_found_pet', { p_id: id }));
+      return rows.length ? (await attach([fromFound(rows[0])]))[0] : null;
+    },
+    async myFound() {
+      const rows = ok(await sb.from('found_reports').select('id,species,color,place,city,created_at,photo_paths,closed_at').eq('is_public', true).order('created_at', { ascending: false }));
+      return attach(rows.map((r) => ({ id: r.id, kind: 'found', species: r.species, color: r.color || '', place: r.place, city: r.city, date: String(r.created_at).slice(0, 10), photos: r.photo_paths || [], closed: !!r.closed_at })));
+    },
+    async publishFound(uid, f, blobs, country, deviceCountry) {
+      const paths = [];
+      for (const b of blobs) paths.push(await DB.uploadBlob(uid, 'found', b));
+      try {
+        return ok(await sb.rpc('publish_found', { p_species: f.species, p_color: f.color || null, p_place: f.place, p_city: f.city, p_country: country, p_device_country: deviceCountry, p_desc: f.desc || null, p_paths: paths }));
+      } catch (e) { await sb.storage.from(BUCKET).remove(paths); throw e; }
+    },
+    async closeFound(id) { ok(await sb.rpc('close_found', { p_id: id })); },
+    async deleteFound(id) {
+      const r = ok(await sb.from('found_reports').select('photo_paths').eq('id', id).maybeSingle());
+      if (r && r.photo_paths && r.photo_paths.length) await sb.storage.from(BUCKET).remove(r.photo_paths);
+      ok(await sb.from('found_reports').delete().eq('id', id));
+    },
+    async sendFoundRequest(id, text) { return ok(await sb.rpc('create_found_contact_request', { p_found: id, p_intro: text })); },
     /* ----- fyndrapporter (privata) ----- */
     async saveFind(uid, f, blobs) {
       const paths = [];
@@ -139,7 +172,9 @@
     },
     /* ----- kontakt och chatt ----- */
     async requests() {
-      return ok(await sb.from('contact_requests').select('id,pet_id,pet_name,finder_id,owner_id,intro,status,created_at,finder:profiles!finder_id(username),owner:profiles!owner_id(username)').order('created_at', { ascending: false }));
+      let r = await sb.from('contact_requests').select('id,pet_id,found_id,pet_name,finder_id,owner_id,intro,status,created_at,finder:profiles!finder_id(username),owner:profiles!owner_id(username)').order('created_at', { ascending: false });
+      if (r.error) r = await sb.from('contact_requests').select('id,pet_id,pet_name,finder_id,owner_id,intro,status,created_at,finder:profiles!finder_id(username),owner:profiles!owner_id(username)').order('created_at', { ascending: false });
+      return ok(r);
     },
     async sendRequest(petId, text) { return ok(await sb.rpc('create_contact_request', { p_pet: petId, p_intro: text })); },
     async respond(id, accept) { ok(await sb.rpc('respond_request', { p_request: id, p_accept: accept })); },

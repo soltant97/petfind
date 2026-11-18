@@ -40,6 +40,14 @@ Fullständig kravlista och beslut finns i Claude-projektet "Pet Finder APP" (dok
 3. AI-bildmatchning.
 Testmiljö: separat Supabase dev-projekt (djurhittaren-dev), se Status nedan. Testa med tre separata konton enligt testkraven i projektet.
 
+## Upphittade djur (nytt, publikt)
+- Under Borttappade djur finns två flikar: "Efterlysta djur" (ägaren söker) och "Upphittade djur" (någon har hittat ett djur, ägaren okänd).
+- Upphittare publicerar från träfflistan ("Publicera som upphittat djur"). Krav: inloggad, minst 1 foto, plats vald via platssymbol/adresslista, platstjänster på och enhetens land = platsens land.
+- Offentligt visas bara område + ort (aldrig gatuadress, namn eller kontaktuppgifter), upphittarens genererade användarnamn och foton.
+- Kontakt via samma tvåvägsgodkännande: den som känner igen djuret skriver introduktion, upphittaren godkänner, sedan privat chatt. Upphittaren kan stänga ("Ägaren är hittad") eller radera; stängd anmälan försvinner från sökning men samtal finns kvar.
+- DB: found_reports (is_public, closed_at, city, country_code, color), contact_requests.found_id, RPC publish_found/close_found/get_found_pets/search_found_pets/get_found_pet/create_found_contact_request. schema.sql MÅSTE köras om i Supabase.
+- Tidigare gällde att fyndrapporter alltid var privata; privata sparade fynd (saveFind) finns kvar, publika är ett separat val.
+
 ## Status (uppdaterad 2026-11-18)
 Klart:
 - Mapp och denna CLAUDE.md skapade. Kravdokumentet "krav-och-beslut" ligger i Claude-projektet.

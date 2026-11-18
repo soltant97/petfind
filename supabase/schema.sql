@@ -132,6 +132,16 @@ create table if not exists public.found_reports (
   created_at timestamptz not null default now()
 );
 
+-- Publika upphittade djur (anmälan av upphittare). Bara område/ort lagras för publik visning, aldrig gatuadress.
+alter table public.found_reports add column if not exists city text;
+alter table public.found_reports add column if not exists country_code text;
+alter table public.found_reports add column if not exists color text;
+alter table public.found_reports add column if not exists is_public boolean not null default false;
+alter table public.found_reports add column if not exists closed_at timestamptz;
+alter table public.found_reports drop constraint if exists found_reports_country_code_check;
+alter table public.found_reports add constraint found_reports_country_code_check check (country_code is null or country_code ~ '^[A-Z]{2}$');
+create index if not exists found_public_idx on public.found_reports(is_public, closed_at);
+
 -- ---------- Blockeringar, kontaktförfrågningar, meddelanden, notiser ----------
 create table if not exists public.blocks (
   blocker_id uuid not null references public.profiles(id) on delete cascade,
@@ -154,6 +164,9 @@ create table if not exists public.contact_requests (
   updated_at timestamptz not null default now()
 );
 create unique index if not exists contact_one_pending on public.contact_requests(pet_id, finder_id) where status = 'pending';
+
+alter table public.contact_requests add column if not exists found_id uuid references public.found_reports(id) on delete set null;
+create unique index if not exists contact_one_pending_found on public.contact_requests(found_id, finder_id) where status = 'pending' and found_id is not null;
 create index if not exists contact_finder_idx on public.contact_requests(finder_id);
 create index if not exists contact_owner_idx on public.contact_requests(owner_id);
 
@@ -246,7 +259,8 @@ create policy reports_owner_select on public.lost_reports for select to authenti
   using (exists (select 1 from public.pets p where p.id = pet_id and p.owner_id = (select auth.uid())));
 
 -- found_reports: privata för upphittaren
-grant select, insert, delete on public.found_reports to authenticated;
+grant select, delete on public.found_reports to authenticated;
+grant insert (finder_id, species, place, description, photo_paths) on public.found_reports to authenticated;
 drop policy if exists found_own_select on public.found_reports;
 drop policy if exists found_own_insert on public.found_reports;
 drop policy if exists found_own_delete on public.found_reports;
@@ -527,11 +541,116 @@ language sql stable security definer set search_path = '' as $$
     from c order by cardinality(c.common_words) desc, c.lost_on desc limit 50;
 $$;
 
+
+-- ---------- Upphittade djur: publicera, stäng, offentlig sökning, kontakt ----------
+-- Platsen som skickas hit är bara område/ort (aldrig gatuadress). Landet måste stämma med enhetens land.
+create or replace function public.publish_found(p_species text, p_color text, p_place text, p_city text, p_country text,
+                                                p_device_country text, p_desc text, p_paths text[])
+returns uuid language plpgsql security definer set search_path = '' as $$
+declare v_id uuid; v_path text;
+begin
+  if auth.uid() is null then raise exception 'Inte inloggad'; end if;
+  if p_species not in ('cat','dog','bird','rabbit','rodent','reptile','other') then raise exception 'Djurslaget stöds inte'; end if;
+  if char_length(trim(coalesce(p_place, ''))) not between 1 and 120 or char_length(trim(coalesce(p_city, ''))) not between 1 and 120 then
+    raise exception 'Plats saknas';
+  end if;
+  if upper(coalesce(p_country, '')) !~ '^[A-Z]{2}$' then raise exception 'Landet stöds inte'; end if;
+  if upper(p_country) is distinct from upper(coalesce(p_device_country, '')) then
+    raise exception 'Platstjänster måste vara på och platsen måste ligga i landet där du befinner dig';
+  end if;
+  if coalesce(cardinality(p_paths), 0) not between 1 and 5 then raise exception '1–5 foton krävs'; end if;
+  foreach v_path in array p_paths loop
+    if v_path not like auth.uid()::text || '/found/%' then raise exception 'Ogiltig bildsökväg'; end if;
+  end loop;
+  if char_length(coalesce(p_desc, '')) > 2000 or char_length(coalesce(p_color, '')) > 80 then raise exception 'För lång text'; end if;
+  insert into public.found_reports (finder_id, species, color, place, city, country_code, description, photo_paths, is_public)
+    values (auth.uid(), p_species, nullif(trim(p_color), ''), trim(p_place), trim(p_city), upper(p_country),
+            nullif(trim(p_desc), ''), p_paths, true)
+    returning id into v_id;
+  return v_id;
+end $$;
+
+-- Upphittaren stänger sin anmälan (t.ex. ägaren är hittad). Försvinner från publik sökning, samtal finns kvar.
+create or replace function public.close_found(p_id uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  update public.found_reports set closed_at = now() where id = p_id and finder_id = auth.uid() and closed_at is null;
+  if not found then raise exception 'Anmälan finns inte eller är redan stängd'; end if;
+end $$;
+
+create or replace function public.get_found_pets(p_limit int default 50, p_offset int default 0, p_country text default null)
+returns table (id uuid, species text, color text, place text, city text, found_on date, description text,
+               finder_username text, photo_paths text[], country_code text)
+language sql stable security definer set search_path = '' as $$
+  select f.id, f.species, f.color, f.place, f.city, f.created_at::date, f.description, pr.username, f.photo_paths, f.country_code
+    from public.found_reports f
+    join public.profiles pr on pr.id = f.finder_id and not pr.paused
+   where f.is_public and f.closed_at is null
+     and (nullif(p_country, '') is null or f.country_code = upper(p_country))
+   order by f.created_at desc
+   limit least(greatest(p_limit, 1), 100) offset greatest(p_offset, 0);
+$$;
+
+create or replace function public.search_found_pets(p_query text default null, p_species text default null,
+                                                    p_limit int default 50, p_offset int default 0,
+                                                    p_country text default null, p_color text default null, p_place text default null)
+returns table (id uuid, species text, color text, place text, city text, found_on date, description text,
+               finder_username text, photo_paths text[], country_code text)
+language sql stable security definer set search_path = '' as $$
+  select g.* from public.get_found_pets(100, 0, p_country) g
+   where (p_species is null or p_species in ('', 'all') or g.species = p_species)
+     and (nullif(trim(p_color), '') is null or position(lower(trim(p_color)) in lower(coalesce(g.color, ''))) > 0)
+     and (nullif(trim(p_place), '') is null or position(lower(trim(p_place)) in lower(concat_ws(' ', g.place, g.city))) > 0)
+     and (nullif(trim(p_query), '') is null
+          or position(lower(trim(p_query)) in lower(concat_ws(' ', g.color, g.description, g.place, g.city))) > 0)
+   limit least(greatest(p_limit, 1), 100) offset greatest(p_offset, 0);
+$$;
+
+create or replace function public.get_found_pet(p_id uuid)
+returns table (id uuid, species text, color text, place text, city text, found_on date, description text,
+               finder_username text, photo_paths text[], country_code text)
+language sql stable security definer set search_path = '' as $$
+  select g.* from public.get_found_pets(100, 0) g where g.id = p_id;
+$$;
+
+-- Ägaren (eller den som tror sig känna igen djuret) kontaktar upphittaren. Samma tvåvägs-godkännande som för borttappade djur.
+-- I contact_requests är finder_id den som skickar förfrågan och owner_id den som svarar (här: upphittaren).
+create or replace function public.create_found_contact_request(p_found uuid, p_intro text) returns uuid
+language plpgsql security definer set search_path = '' as $$
+declare v_poster uuid; v_species text; v_id uuid; v_intro text := trim(p_intro);
+begin
+  if auth.uid() is null then raise exception 'Inte inloggad'; end if;
+  if char_length(v_intro) not between 1 and 2000 then raise exception 'Meddelandet måste vara 1–2000 tecken'; end if;
+  select f.finder_id, f.species into v_poster, v_species
+    from public.found_reports f join public.profiles pr on pr.id = f.finder_id
+    where f.id = p_found and f.is_public and f.closed_at is null and not pr.paused;
+  if v_poster is null then raise exception 'Anmälan är inte längre aktuell'; end if;
+  if v_poster = auth.uid() then raise exception 'Det här är din egen anmälan'; end if;
+  if exists (select 1 from public.blocks
+             where (blocker_id = v_poster and blocked_id = auth.uid()) or (blocker_id = auth.uid() and blocked_id = v_poster)) then
+    raise exception 'Du kan inte kontakta den här användaren';
+  end if;
+  if exists (select 1 from public.contact_requests where found_id = p_found and finder_id = auth.uid() and status = 'pending') then
+    raise exception 'Du har redan en väntande förfrågan för det här djuret';
+  end if;
+  insert into public.contact_requests (found_id, pet_name, finder_id, owner_id, intro)
+    values (p_found, 'found:' || v_species, auth.uid(), v_poster, v_intro) returning id into v_id;
+  insert into public.notifications (user_id, type, request_id, pet_name) values (v_poster, 'request', v_id, 'found:' || v_species);
+  return v_id;
+end $$;
+
 -- Behörigheter för funktionerna: först ta bort allt, sedan ge bara det som behövs
 revoke all on all functions in schema public from public, anon, authenticated;
 grant execute on function public.get_lost_pets(int, int, text) to anon, authenticated;
 grant execute on function public.search_lost_pets(text, text, int, int, text, text, text, text) to anon, authenticated;
 grant execute on function public.get_lost_pet(uuid) to anon, authenticated;
+grant execute on function public.get_found_pets(int, int, text) to anon, authenticated;
+grant execute on function public.search_found_pets(text, text, int, int, text, text, text) to anon, authenticated;
+grant execute on function public.get_found_pet(uuid) to anon, authenticated;
+grant execute on function public.publish_found(text, text, text, text, text, text, text, text[]) to authenticated;
+grant execute on function public.close_found(uuid) to authenticated;
+grant execute on function public.create_found_contact_request(uuid, text) to authenticated;
+
 grant execute on function public.match_lost_pets(text, text, text, text, text) to anon, authenticated;
 grant execute on function public.change_username(text) to authenticated;
 grant execute on function public.set_paused(boolean) to authenticated;
@@ -578,7 +697,11 @@ language sql stable security definer set search_path = '' as $$
     select 1 from public.pet_photos ph
       join public.pets p on p.id = ph.pet_id and p.status = 'lost'
       join public.profiles pr on pr.id = p.owner_id and not pr.paused
-     where ph.path = p_path);
+     where ph.path = p_path)
+  or exists (
+    select 1 from public.found_reports f
+      join public.profiles pr on pr.id = f.finder_id and not pr.paused
+     where f.is_public and f.closed_at is null and p_path = any(f.photo_paths));
 $$;
 revoke all on function public.photo_is_public(text) from public;
 grant execute on function public.photo_is_public(text) to anon, authenticated;
