@@ -2,7 +2,7 @@
 /* DjurHittaren – webbapp kopplad till Supabase. Se db.js för all datakommunikation. */
 const T={
 appname:['DjurHittaren','DjurHittaren'],
-lostTitle:['Borttappade djur','Lost pets'],lostSub:['Hjälp oss hitta hem igen. Du behöver inget konto för att söka.','Help them find their way home. No account needed to search.'],
+lostTitle:['Borttappade djur','Lost pets'],lostSub:['Hjälp oss hitta hem igen. Håll utkik i ditt område.','Help them find their way home. Keep an eye out in your area.'],
 searchPh:['Sök plats, ras eller färg','Search place, breed or colour'],all:['Alla','All'],cat:['Katt','Cat'],dog:['Hund','Dog'],other:['Annat','Other'],
 lost:['Borttappad','Lost'],registered:['Registrerad','Registered'],foundSt:['Återfunnen','Reunited'],
 noLost:['Inga borttappade djur matchar din sökning.','No lost pets match your search.'],
