@@ -28,13 +28,13 @@ $$;
 alter table public.profiles add column if not exists avatar text not null default public.random_avatar();
 alter table public.profiles drop constraint if exists profiles_avatar_check;
 alter table public.profiles add constraint profiles_avatar_check
-  check (avatar ~ '^(cat|dog|rabbit|fox|bear|panda|mouse|bird|hamster|guineapig|parrot|chicken|squirrel|zebra|horse|lion|monkey|pig|cow|tiger):[0-7]:[0-3]$');
+  check (avatar ~ '^(cat|dog|rabbit|fox|bear|panda|mouse|bird|hamster|guineapig|parrot|chicken|squirrel|zebra|horse|lion|monkey|pig|cow|tiger):[0-7]:[0-9](:([0-9]|1[0-5]))?$');
 
 create or replace function public.set_avatar(p_avatar text) returns void
 language plpgsql security definer set search_path = '' as $$
 begin
   if auth.uid() is null then raise exception 'Inte inloggad'; end if;
-  if p_avatar !~ '^(cat|dog|rabbit|fox|bear|panda|mouse|bird|hamster|guineapig|parrot|chicken|squirrel|zebra|horse|lion|monkey|pig|cow|tiger):[0-7]:[0-3]$' then raise exception 'Ogiltig avatar'; end if;
+  if p_avatar !~ '^(cat|dog|rabbit|fox|bear|panda|mouse|bird|hamster|guineapig|parrot|chicken|squirrel|zebra|horse|lion|monkey|pig|cow|tiger):[0-7]:[0-9](:([0-9]|1[0-5]))?$' then raise exception 'Ogiltig avatar'; end if;
   update public.profiles set avatar = p_avatar where id = auth.uid();
 end $$;
 
