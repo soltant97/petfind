@@ -84,3 +84,5 @@ nav a.cam span{width:62px;height:62px;border-radius:50%;background:var(--y);bord
 #mapov .mlabel{font-weight:800;font-size:16px;min-height:22px}#mapov .row{gap:8px;flex-wrap:nowrap}#mapov .row .btn{flex:1}
 
 .flag{font-size:30px;line-height:1;flex:0 0 auto}
+select{-webkit-appearance:none;appearance:none;padding-right:44px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237A6552' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 18px center;background-size:16px;text-overflow:ellipsis}
+select:disabled{opacity:.6}
