@@ -186,3 +186,4 @@ body.inchat .chatbg>:first-child{margin-top:auto}
 .card .ph{position:relative}.savebtn.cardsave{position:absolute;right:4px;top:4px;width:32px;height:32px;border-radius:50%;border:0;background:#fff;box-shadow:0 1px 5px rgba(58,42,30,.25);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;z-index:2}.savebtn.cardsave svg{width:18px;height:18px}.savebtn.cardsave.on{background:var(--y)}
 a.card{position:relative}.savebtn.cardsave{right:10px;top:auto;bottom:10px;width:36px;height:36px}.card .grow{padding-right:4px}
 .t-found{background:var(--lc);color:var(--ct)}
+.homelink{display:flex;align-items:center;gap:12px;margin-top:12px;padding:12px 14px;border-radius:16px;background:var(--ly);text-decoration:none;color:var(--t)}.homelink>span{display:flex}.homelink>div{flex:1}.homelink b{display:block}.homelink small{color:var(--m);font-weight:700}.homelink i{font-style:normal;font-size:24px;font-weight:800}

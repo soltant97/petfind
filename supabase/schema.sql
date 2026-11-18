@@ -464,6 +464,7 @@ begin
   if not exists (select 1 from public.pets where id = p_pet and owner_id = auth.uid()) then
     raise exception 'Djuret finns inte eller är inte ditt';
   end if;
+  update public.lost_reports set status = 'archived', archived_at = now() where pet_id = p_pet and status = 'active';
   update public.pets set status = 'found' where id = p_pet;
 end $$;
 
@@ -620,6 +621,32 @@ returns table (id uuid, name text, species text, breed text, color text, sex tex
                eye_color text, size text, collar text, age_months int)
 language sql stable security definer set search_path = '' as $$
   select g.* from public.get_lost_pets(100, 0) g where g.id = p_id;
+$$;
+
+-- Sidan Upphittade djur: djur som hittat hem de senaste 30 dagarna (äldre arkiveras = visas inte).
+-- Inga personuppgifter, inget användarnamn. Bara aktivt konto.
+drop function if exists public.get_reunited(int, text);
+create or replace function public.get_reunited(p_limit int default 50, p_country text default null)
+returns table (kind text, id uuid, name text, species text, city text, reunited_on date, photo_paths text[], country_code text)
+language sql stable security definer set search_path = '' as $$
+  select * from (
+    select 'lost'::text, p.id, p.name, p.species, r.last_city, r.archived_at::date,
+           coalesce((select array_agg(ph.path order by ph.sort, ph.created_at) from public.pet_photos ph where ph.pet_id = p.id), '{}'),
+           r.country_code
+      from public.pets p
+      join public.lost_reports r on r.pet_id = p.id and r.status = 'archived' and r.archived_at > now() - interval '30 days'
+      join public.profiles pr on pr.id = p.owner_id and not pr.paused
+     where p.status = 'found'
+       and r.id = (select r2.id from public.lost_reports r2 where r2.pet_id = p.id order by r2.created_at desc limit 1)
+    union all
+    select 'found'::text, f.id, null::text, f.species, f.city, f.closed_at::date, f.photo_paths, f.country_code
+      from public.found_reports f
+      join public.profiles pr on pr.id = f.finder_id and not pr.paused
+     where f.is_public and f.closed_at > now() - interval '30 days'
+  ) x(kind, id, name, species, city, reunited_on, photo_paths, country_code)
+   where nullif(p_country, '') is null or x.country_code = upper(p_country)
+   order by x.reunited_on desc
+   limit least(greatest(p_limit, 1), 100);
 $$;
 
 -- Upphittat-flödet: förfilter (borttappad + samma djurslag + område) och ordöverlappning.
@@ -815,6 +842,7 @@ grant execute on function public.get_lost_pets(int, int, text) to anon, authenti
 grant execute on function public.search_lost_pets(text, text, int, int, text, text, text, text) to anon, authenticated;
 grant execute on function public.get_lost_pet(uuid) to anon, authenticated;
 grant execute on function public.get_found_pets(int, int, text) to anon, authenticated;
+grant execute on function public.get_reunited(int, text) to anon, authenticated;
 grant execute on function public.search_found_pets(text, text, int, int, text, text, text) to anon, authenticated;
 grant execute on function public.get_found_pet(uuid) to anon, authenticated;
 grant execute on function public.publish_found(text, text, text, text, text, text, text, text[], text, text, text, text, text) to authenticated;
@@ -995,7 +1023,17 @@ language sql stable security definer set search_path = '' as $$
   or exists (
     select 1 from public.found_reports f
       join public.profiles pr on pr.id = f.finder_id and not pr.paused
-     where f.is_public and f.closed_at is null and p_path = any(f.photo_paths));
+     where f.is_public and f.closed_at is null and p_path = any(f.photo_paths))
+  or exists (  -- hittat hem de senaste 30 dagarna (sidan Upphittade djur)
+    select 1 from public.pet_photos ph
+      join public.pets p on p.id = ph.pet_id and p.status = 'found'
+      join public.lost_reports r on r.pet_id = p.id and r.status = 'archived' and r.archived_at > now() - interval '30 days'
+      join public.profiles pr on pr.id = p.owner_id and not pr.paused
+     where ph.path = p_path)
+  or exists (
+    select 1 from public.found_reports f
+      join public.profiles pr on pr.id = f.finder_id and not pr.paused
+     where f.is_public and f.closed_at > now() - interval '30 days' and p_path = any(f.photo_paths));
 $$;
 revoke all on function public.photo_is_public(text) from public;
 grant execute on function public.photo_is_public(text) to anon, authenticated;

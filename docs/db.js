@@ -178,6 +178,10 @@
       const rows = ok(await sb.rpc('get_found_pet', { p_id: id }));
       return rows.length ? (await attach([fromFound(rows[0])]))[0] : null;
     },
+    async reunited(country) {
+      const rows = ok(await sb.rpc('get_reunited', { p_limit: 50, p_country: country || null }));
+      return attach(rows.map((r) => ({ id: r.id, kind: r.kind, name: r.name || '', species: r.species, city: r.city, date: r.reunited_on, photos: r.photo_paths || [] })));
+    },
     async myFound() {
       const rows = ok(await sb.from('found_reports').select('id,species,color,place,city,created_at,photo_paths,closed_at').eq('is_public', true).order('created_at', { ascending: false }));
       return attach(rows.map((r) => ({ id: r.id, kind: 'found', species: r.species, color: r.color || '', place: r.place, city: r.city, date: String(r.created_at).slice(0, 10), photos: r.photo_paths || [], closed: !!r.closed_at })));
