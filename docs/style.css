@@ -162,3 +162,8 @@ body.inchat .chatpad .msgs{flex:1;min-height:0;overflow-y:auto;margin-top:0}
 body.inchat .chatpad .sendbar{margin-top:10px;flex:none}
 body.inchat .chatpad .chatsearch{flex:none}
 body.inchat .chatbg>:first-child{margin-top:auto}
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:901;width:min(88vw,360px);background:var(--w);border-radius:26px;padding:26px 22px 18px;display:flex;flex-direction:column;gap:10px;text-align:center;box-shadow:0 12px 40px rgba(58,42,30,.3)}
+.modal h2{margin:4px 0 0;font-size:22px}.modal p{margin:0 0 6px;color:var(--m);font-weight:600;line-height:1.4}
+.gicon{width:64px;height:64px;border-radius:20px;background:var(--y);display:flex;align-items:center;justify-content:center;margin:0 auto 4px}
+.linkbtn{border:0;background:transparent;font:inherit;font-weight:800;color:var(--m);padding:10px;cursor:pointer}
+.seemore{width:100%;border:2px dashed rgba(58,42,30,.25);background:var(--db);border-radius:18px;padding:16px;font:inherit;font-weight:800;color:var(--t);cursor:pointer;margin-top:4px}
