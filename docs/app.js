@@ -239,7 +239,6 @@ if(p.street){a.road=p.street;if(p.housenumber)a.house_number=p.housenumber}else 
 a.suburb=p.district||p.locality||(['district','locality'].includes(ty)?p.name:'');a.city=p.city||(ty==='city'?p.name:'')||p.county||'';
 if(!streetOf(a)&&!areaOf(a)&&!cityOf(a))continue;const m=mkPlace(a);if(seen[m.label])continue;seen[m.label]=1;out.push(m)}return out}
 function onPlaceInput(v,fid){fid=fid||'lp';tmp.sugField=fid;clearTimeout(sugTimer);if(fid==='lp'&&tmp.lostLoc&&tmp.lostLoc.label!==v)tmp.lostLoc=null;const e0=$('#sug');if(v.trim().length<2){clearSug();return}
-if(e0)e0.innerHTML=`<div class="hint" style="padding:10px 14px;margin:0">${t('mapFinding')}</div>`;
 sugTimer=setTimeout(async()=>{if(sugCtl)sugCtl.abort();sugCtl=new AbortController();
 try{const res=await searchPlaces(v.trim());const e=$('#sug');if(!e||!$('#'+fid)||$('#'+fid).value.trim()!==v.trim())return;tmp.sugs=res;e.innerHTML=res.length?res.map((x,i)=>`<button type="button" data-act="pickSug" data-v="${i}">${esc(x.label)}</button>`).join(''):`<div class="hint" style="padding:10px 14px;margin:0">${t('sugNone')}</div>`}catch(x){if(x&&x.name==='AbortError')return;const e=$('#sug');if(e)e.innerHTML=`<div class="hint" style="padding:10px 14px;margin:0">${t('sugFail')}</div>`}},350)}
 /* ---------- färger ---------- */
