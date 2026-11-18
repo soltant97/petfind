@@ -74,6 +74,7 @@ create table if not exists public.pets (
   color text not null check (char_length(color) between 1 and 80),
   sex text not null default 'unknown' check (sex in ('f','m','unknown')),
   age_years int check (age_years between 0 and 40),
+  birth_date date,
   marks text check (char_length(marks) <= 500),
   description text check (char_length(description) <= 2000),
   chip_number text check (char_length(chip_number) <= 40),   -- visas ALDRIG offentligt
@@ -298,8 +299,11 @@ alter table public.found_reports drop constraint if exists found_reports_species
 alter table public.found_reports add constraint found_reports_species_check
   check (species in ('cat','dog','bird','rabbit','rodent','reptile','other'));
 
-grant insert (owner_id, name, species, breed, color, sex, age_years, marks, description, chip_number) on public.pets to authenticated;
-grant update (name, species, breed, color, sex, age_years, marks, description, chip_number, status) on public.pets to authenticated;
+alter table public.pets add column if not exists birth_date date;
+alter table public.pets drop constraint if exists pets_birth_date_ok;
+alter table public.pets add constraint pets_birth_date_ok check (birth_date is null or (birth_date <= current_date and birth_date >= date '1980-01-01'));
+grant insert (owner_id, name, species, breed, color, sex, age_years, birth_date, marks, description, chip_number) on public.pets to authenticated;
+grant update (name, species, breed, color, sex, age_years, birth_date, marks, description, chip_number, status) on public.pets to authenticated;
 drop policy if exists pets_owner_select on public.pets;
 drop policy if exists pets_owner_insert on public.pets;
 drop policy if exists pets_owner_update on public.pets;
@@ -549,7 +553,7 @@ create or replace function public.get_lost_pets(p_limit int default 50, p_offset
 returns table (id uuid, name text, species text, breed text, color text, sex text, age_years int, marks text,
                last_place text, last_city text, lost_on date, circumstances text, owner_username text, photo_paths text[], country_code text)
 language sql stable security definer set search_path = '' as $$
-  select p.id, p.name, p.species, p.breed, p.color, p.sex, p.age_years, p.marks,
+  select p.id, p.name, p.species, p.breed, p.color, p.sex, coalesce(date_part('year', age(p.birth_date))::int, p.age_years), p.marks,
          r.last_place, r.last_city, r.lost_on, r.circumstances, pr.username,
          coalesce((select array_agg(ph.path order by ph.sort, ph.created_at) from public.pet_photos ph where ph.pet_id = p.id), '{}'),
          r.country_code

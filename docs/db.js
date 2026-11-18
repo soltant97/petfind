@@ -26,12 +26,20 @@
     circ: r.circumstances || '', owner: r.owner_username, photos: r.photo_paths || [], status: 'lost',
     score: r.score, common: r.common || []
   });
+  /* Ålder i hela år från födelsedatum (YYYY-MM-DD); annars den gamla sparade åldern. */
+  function ageOf(birth, fallback) {
+    if (!birth) return fallback == null ? null : fallback;
+    const b = new Date(birth + 'T12:00:00'), n = new Date();
+    let y = n.getFullYear() - b.getFullYear();
+    if (n.getMonth() < b.getMonth() || (n.getMonth() === b.getMonth() && n.getDate() < b.getDate())) y--;
+    return Math.max(0, Math.min(40, y));
+  }
   function fromOwn(r) {
     const rep = (r.lost_reports || []).find((x) => x.status === 'active');
     const photos = (r.pet_photos || []).slice().sort((a, b) => a.sort - b.sort).map((x) => x.path);
     return {
       id: r.id, name: r.name, species: r.species, breed: r.breed || '', color: r.color || '', sex: r.sex,
-      age: r.age_years, marks: r.marks || '', desc: r.description || '', chip: r.chip_number || '', status: r.status,
+      age: ageOf(r.birth_date, r.age_years), birth: r.birth_date || '', marks: r.marks || '', desc: r.description || '', chip: r.chip_number || '', status: r.status,
       place: rep ? rep.last_place : '', city: rep ? rep.last_city : '', date: rep ? rep.lost_on : '',
       circ: rep ? rep.circumstances : '', photos, owner: null, mineFlag: true
     };
@@ -127,7 +135,7 @@
     },
     async addPet(uid, f, blobs) {
       const pet = ok(await sb.from('pets').insert({ owner_id: uid, name: f.name, species: f.species, breed: f.breed || null, color: f.color,
-        sex: f.sex || 'unknown', age_years: f.age === '' || f.age == null ? null : +f.age, marks: f.marks || null, description: f.desc || null, chip_number: f.chip || null }).select('id').single());
+        sex: f.sex || 'unknown', age_years: ageOf(f.birth, null), birth_date: f.birth || null, marks: f.marks || null, description: f.desc || null, chip_number: f.chip || null }).select('id').single());
       try {
         const angles = ['front', 'left', 'right'];
         for (let i = 0; i < blobs.length; i++) {
@@ -139,7 +147,7 @@
     },
     async updatePet(id, f) {
       ok(await sb.from('pets').update({ name: f.name, species: f.species, breed: f.breed || null, color: f.color, sex: f.sex || 'unknown',
-        age_years: f.age === '' || f.age == null ? null : +f.age, marks: f.marks || null, description: f.desc || null, chip_number: f.chip || null }).eq('id', id));
+        age_years: ageOf(f.birth, null), birth_date: f.birth || null, marks: f.marks || null, description: f.desc || null, chip_number: f.chip || null }).eq('id', id));
     },
     async deletePet(id) {
       const ph = ok(await sb.from('pet_photos').select('path').eq('pet_id', id));
