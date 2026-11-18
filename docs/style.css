@@ -155,3 +155,9 @@ input[type=search]{width:100%;border:1.5px solid var(--db);background:#fff;borde
 a.uchip{text-decoration:none;color:inherit}
 .chatwho.cc0{background:#FFE3DC}.chatwho.cc1{background:#FFF3C9}.chatwho.cc2{background:#E9DCC8}.chatwho.cc3{background:#FFD9C2}.chatwho.cc4{background:#F7E4A8}
 .chatwho .cwn{flex:1}.chatwho .chev{flex:none}
+body.inchat #navwrap{display:none}
+body.inchat #app{padding-bottom:0;height:100vh;height:100dvh;min-height:0;display:flex;flex-direction:column}
+body.inchat .chatpad{flex:1;min-height:0;display:flex;flex-direction:column;padding:10px 12px 12px}
+body.inchat .chatpad .msgs{flex:1;min-height:0;overflow-y:auto;margin-top:0}
+body.inchat .chatpad .sendbar{margin-top:10px;flex:none}
+body.inchat .chatpad .chatsearch{flex:none}
