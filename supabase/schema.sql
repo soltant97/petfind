@@ -190,6 +190,11 @@ create unique index if not exists contact_one_pending_found on public.contact_re
 create index if not exists contact_finder_idx on public.contact_requests(finder_id);
 create index if not exists contact_owner_idx on public.contact_requests(owner_id);
 
+-- Bilder som bifogas en kontaktförfrågan (privata; syns bara för de två parterna)
+alter table public.contact_requests add column if not exists photo_paths text[] not null default '{}';
+alter table public.contact_requests drop constraint if exists contact_requests_photos_max;
+alter table public.contact_requests add constraint contact_requests_photos_max check (cardinality(photo_paths) <= 5);
+
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
   request_id uuid not null references public.contact_requests(id) on delete cascade,
@@ -726,6 +731,28 @@ grant execute on function public.respond_request(uuid, boolean) to authenticated
 grant execute on function public.revoke_request(uuid) to authenticated;
 grant execute on function public.send_message(uuid, text) to authenticated;
 grant execute on function public.mark_read(uuid) to authenticated;
+-- Bifoga bilder till sin egen väntande förfrågan (max 5, bara i den egna mappen <användar-id>/contact/)
+create or replace function public.attach_request_photos(p_request uuid, p_paths text[]) returns void
+language plpgsql security definer set search_path = '' as $$
+declare v_path text;
+begin
+  if auth.uid() is null then raise exception 'Inte inloggad'; end if;
+  if coalesce(cardinality(p_paths), 0) not between 1 and 5 then raise exception '1–5 bilder'; end if;
+  foreach v_path in array p_paths loop
+    if v_path not like auth.uid()::text || '/contact/%' then raise exception 'Ogiltig bildsökväg'; end if;
+  end loop;
+  update public.contact_requests set photo_paths = p_paths
+   where id = p_request and finder_id = auth.uid() and status = 'pending' and cardinality(photo_paths) = 0;
+  if not found then raise exception 'Förfrågan finns inte eller kan inte få fler bilder'; end if;
+end $$;
+
+-- Bilder i en förfrågan får läsas av de två parterna
+create or replace function public.request_photo_visible(p_path text) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.contact_requests cr
+                  where p_path = any(cr.photo_paths) and auth.uid() in (cr.finder_id, cr.owner_id));
+$$;
+
 -- Avblockera en användare man själv blockerat
 create or replace function public.unblock_user(p_user uuid) returns void
 language sql security definer set search_path = '' as $$
@@ -733,6 +760,8 @@ language sql security definer set search_path = '' as $$
 $$;
 grant execute on function public.block_user(uuid) to authenticated;
 grant execute on function public.unblock_user(uuid) to authenticated;
+grant execute on function public.attach_request_photos(uuid, text[]) to authenticated;
+grant execute on function public.request_photo_visible(text) to authenticated;
 grant execute on function public.set_avatar(text) to authenticated;
 grant execute on function public.get_notif_off() to authenticated;
 grant execute on function public.set_notif_pref(text, boolean) to authenticated;
@@ -778,6 +807,9 @@ language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function public.photo_is_public(text) from public;
 grant execute on function public.photo_is_public(text) to anon, authenticated;
+drop policy if exists "pet-photos request parties read" on storage.objects;
+create policy "pet-photos request parties read" on storage.objects for select to authenticated
+  using (bucket_id = 'pet-photos' and public.request_photo_visible(name));
 create policy "pet-photos public lost" on storage.objects for select to anon, authenticated
   using (bucket_id = 'pet-photos' and public.photo_is_public(name));
 

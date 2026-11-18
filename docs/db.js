@@ -186,13 +186,17 @@
     },
     /* ----- kontakt och chatt ----- */
     async requests() {
-      let r = await sb.from('contact_requests').select('id,pet_id,found_id,pet_name,finder_id,owner_id,intro,status,created_at,finder:profiles!finder_id(username,avatar),owner:profiles!owner_id(username,avatar)').order('created_at', { ascending: false });
+      let r = await sb.from('contact_requests').select('id,pet_id,found_id,photo_paths,pet_name,finder_id,owner_id,intro,status,created_at,finder:profiles!finder_id(username,avatar),owner:profiles!owner_id(username,avatar)').order('created_at', { ascending: false });
+      if (r.error) r = await sb.from('contact_requests').select('id,pet_id,found_id,pet_name,finder_id,owner_id,intro,status,created_at,finder:profiles!finder_id(username,avatar),owner:profiles!owner_id(username,avatar)').order('created_at', { ascending: false });
       if (r.error) r = await sb.from('contact_requests').select('id,pet_id,pet_name,finder_id,owner_id,intro,status,created_at,finder:profiles!finder_id(username),owner:profiles!owner_id(username)').order('created_at', { ascending: false });
       return ok(r);
     },
     async sendRequest(petId, text) { return ok(await sb.rpc('create_contact_request', { p_pet: petId, p_intro: text })); },
     async respond(id, accept) { ok(await sb.rpc('respond_request', { p_request: id, p_accept: accept })); },
     async revoke(id) { ok(await sb.rpc('revoke_request', { p_request: id })); },
+    async attachRequestPhotos(reqId, paths) { ok(await sb.rpc('attach_request_photos', { p_request: reqId, p_paths: paths })); },
+    async urlsFor(paths) { await signed(paths || []); const m = {}; (paths || []).forEach((p) => { if (urlCache.get(p)) m[p] = urlCache.get(p); }); return m; },
+    async lastMessages() { return ok(await sb.from('messages').select('request_id,sender_id,body,created_at,read_at').order('created_at', { ascending: false }).limit(300)); },
     async messages(reqId) { return ok(await sb.from('messages').select('id,sender_id,body,created_at').eq('request_id', reqId).order('created_at', { ascending: true })); },
     async send(reqId, body) { ok(await sb.rpc('send_message', { p_request: reqId, p_body: body })); },
     async markRead(reqId) { ok(await sb.rpc('mark_read', { p_request: reqId })); },
